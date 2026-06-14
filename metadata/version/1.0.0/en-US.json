@@ -1,0 +1,8 @@
+{
+  "description": "Browse with clear, familiar mobile controls—and spend less time waiting on artificial page delays.\n\nSpeed Browser can accelerate JavaScript timeouts and intervals from 1× to 100×. Choose quick presets, enter an exact multiplier, or disable acceleration for websites that need normal timing. Each timer API can be controlled independently.\n\nManual mode gives you a live view of active page timers. Invoke a timer immediately, pause invocations, disable one call, block a repeating source, or hide noisy sources.\n\nSpeed Browser keeps your preferences and recent URLs on your device. It contains no ads and no third-party analytics.\n\nSpeed Browser changes JavaScript timer behavior. It does not speed up downloads, media playback, network requests, or CSS animations. Some websites may behave unexpectedly at high multipliers; you can always switch to 1× or disable acceleration for that site.",
+  "keywords": "browser,speed,timer,web,productivity,developer,timeout,interval,fast,automation",
+  "marketingUrl": "https://jonluca.github.io/speed-browser/",
+  "promotionalText": "A familiar iOS browser with precise controls for skipping artificial JavaScript timer delays.",
+  "supportUrl": "https://jonluca.github.io/speed-browser/support.html",
+  "whatsNew": "Introducing Speed Browser: focused mobile browsing, configurable JavaScript timer acceleration, per-site controls, and a manual timer inspector."
+}

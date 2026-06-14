@@ -1,0 +1,82 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "promise", "unicorn", "react"],
+  "categories": {
+    "correctness": "off"
+  },
+  "env": {
+    "builtin": true,
+    "es2026": true,
+    "browser": true,
+    "node": true,
+    "serviceworker": true,
+    "worker": true
+  },
+  "ignorePatterns": [
+    ".expo/**/*",
+    "node_modules/**/*",
+    "android/**/*",
+    "ios/**/*",
+    "metro.config.js",
+    "babel.config.js"
+  ],
+  "rules": {
+    "no-debugger": "error",
+    "no-duplicate-case": "error",
+    "no-empty": "error",
+    "no-fallthrough": "error",
+    "no-irregular-whitespace": "error",
+    "no-loss-of-precision": "error",
+    "no-prototype-builtins": "error",
+    "no-self-assign": "error",
+    "no-unsafe-finally": "error",
+    "no-unused-vars": [
+      "error",
+      {
+        "varsIgnorePattern": "^_",
+        "argsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
+      }
+    ],
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-require-imports": "error",
+    "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
+    "@typescript-eslint/consistent-type-imports": [
+      "error",
+      {
+        "fixStyle": "inline-type-imports",
+        "prefer": "type-imports"
+      }
+    ],
+    "@typescript-eslint/no-import-type-side-effects": "error",
+    "curly": ["error", "all"],
+    "react-compiler/react-compiler": "error",
+    "react-hooks/exhaustive-deps": "error",
+    "react-hooks/rules-of-hooks": "error",
+    "prefer-const": "error"
+  },
+  "jsPlugins": ["eslint-plugin-react-compiler"],
+  "globals": {
+    "React": "writable"
+  },
+  "settings": {
+    "react": {
+      "version": "19.2.3"
+    }
+  },
+  "overrides": [
+    {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        "no-undef": "off",
+        "no-unreachable": "off",
+        "no-var": "error",
+        "prefer-rest-params": "error",
+        "prefer-spread": "error"
+      },
+      "globals": {
+        "__DEV__": "writable"
+      }
+    }
+  ]
+}

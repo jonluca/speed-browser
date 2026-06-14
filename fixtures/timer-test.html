@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Speed Browser Timer Test</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 32px 22px 180px;
+        background: Canvas;
+        color: CanvasText;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+      }
+
+      p {
+        color: GrayText;
+        line-height: 1.45;
+      }
+
+      .card {
+        margin-top: 24px;
+        padding: 20px;
+        border: 1px solid color-mix(in srgb, CanvasText 16%, transparent);
+        border-radius: 18px;
+        background: color-mix(in srgb, Canvas 92%, CanvasText 8%);
+      }
+
+      .value {
+        display: block;
+        margin-top: 5px;
+        color: #0a84ff;
+        font-size: 28px;
+        font-weight: 750;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Timer test</h1>
+    <p>A 4,000ms timeout should complete in about 2,000ms when Speed Browser is set to 2×.</p>
+    <section class="card">
+      <strong>Timeout</strong>
+      <span class="value" id="timeout">Waiting…</span>
+    </section>
+    <section class="card">
+      <strong>1,000ms interval</strong>
+      <span class="value" id="interval">0 ticks</span>
+    </section>
+    <script>
+      const startedAt = performance.now();
+      const timeoutOutput = document.querySelector("#timeout");
+      const intervalOutput = document.querySelector("#interval");
+      let ticks = 0;
+
+      setTimeout(() => {
+        timeoutOutput.textContent = `Completed in ${Math.round(performance.now() - startedAt)}ms`;
+      }, 4000);
+
+      setInterval(() => {
+        ticks += 1;
+        intervalOutput.textContent = `${ticks} ticks in ${Math.round(performance.now() - startedAt)}ms`;
+      }, 1000);
+    </script>
+  </body>
+</html>

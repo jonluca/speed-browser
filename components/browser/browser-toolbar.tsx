@@ -1,17 +1,17 @@
-import { BlurView } from "expo-blur";
-import { useEffect, useRef, useState } from "react";
-import { Keyboard, StyleSheet, Text, TextInput, View, useColorScheme } from "react-native";
+import * as Haptics from "expo-haptics";
+import { useRef, useState } from "react";
+import { Keyboard, StyleSheet, Text, TextInput, View } from "react-native";
 import { Pressable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconSymbol } from "@/components/icon-symbol";
+import { GlassSurface } from "@/components/ui/glass-surface";
 import { IconButton } from "@/components/ui/icon-button";
-import type { SpeedConfig } from "@/types/speed";
 import { useAppColors } from "@/theme/colors";
+import type { SpeedConfig } from "@/types/speed";
 import { formatSpeed, getHostname, isHostExcluded, normalizeUrl } from "@/utils/speed-config";
 
 interface BrowserToolbarProps {
-  addressFocusRequest: number;
   canGoBack: boolean;
   canGoForward: boolean;
   config: SpeedConfig;
@@ -24,11 +24,11 @@ interface BrowserToolbarProps {
   onReload: () => void;
   onSettings: () => void;
   onShare: () => void;
+  onStop: () => void;
   progress: number;
 }
 
 export function BrowserToolbar({
-  addressFocusRequest,
   canGoBack,
   canGoForward,
   config,
@@ -41,10 +41,10 @@ export function BrowserToolbar({
   onReload,
   onSettings,
   onShare,
+  onStop,
   progress,
 }: BrowserToolbarProps) {
   const colors = useAppColors();
-  const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const [draft, setDraft] = useState(currentUrl ?? "");
@@ -53,7 +53,7 @@ export function BrowserToolbar({
   const isSecureUrl = currentUrl?.toLowerCase().startsWith("https://") ?? false;
   const isInsecureUrl = currentUrl?.toLowerCase().startsWith("http://") ?? false;
   const speedActive = config.enabled && !isHostExcluded(config, host);
-  const statusLabel = !config.enabled
+  const speedLabel = !config.enabled
     ? "Off"
     : isHostExcluded(config, host)
       ? "Site off"
@@ -61,13 +61,7 @@ export function BrowserToolbar({
         ? config.pauseInvocations
           ? "Paused"
           : "Manual"
-        : formatSpeed(config.speed);
-
-  useEffect(() => {
-    if (addressFocusRequest > 0) {
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
-  }, [addressFocusRequest]);
+        : formatSpeed(config.speed).replace("x", "×");
 
   const submit = () => {
     const target = normalizeUrl(draft);
@@ -79,190 +73,261 @@ export function BrowserToolbar({
     onNavigate(target);
   };
 
+  const stopEditing = () => {
+    setDraft(currentUrl ?? "");
+    setIsEditing(false);
+    Keyboard.dismiss();
+  };
+
   return (
-    <View pointerEvents={"box-none"} style={styles.container}>
-      <BlurView
-        intensity={80}
-        style={[styles.chrome, { paddingBottom: Math.max(insets.bottom, 8) }]}
-        tint={colorScheme === "dark" ? "dark" : "systemChromeMaterial"}
-      >
-        {isLoading ? (
-          <View style={[styles.progressTrack, { backgroundColor: colors.divider }]}>
-            <View
-              style={[styles.progress, { backgroundColor: colors.accent, width: `${Math.max(4, progress * 100)}%` }]}
+    <View pointerEvents={"box-none"} style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+      <View style={styles.addressRow}>
+        <GlassSurface
+          fallbackColor={colors.chrome}
+          style={[styles.addressSurface, { borderColor: colors.glassStroke }]}
+        >
+          <View style={styles.addressContent}>
+            <View style={styles.addressLeading}>
+              <IconSymbol
+                color={isInsecureUrl ? colors.danger : colors.secondaryLabel}
+                name={
+                  isSecureUrl
+                    ? "lock.fill"
+                    : isInsecureUrl
+                      ? "exclamationmark.triangle.fill"
+                      : currentUrl
+                        ? "globe"
+                        : "magnifyingglass"
+                }
+                size={13}
+                weight={"semibold"}
+              />
+            </View>
+            <TextInput
+              accessibilityLabel={"Address"}
+              autoCapitalize={"none"}
+              autoCorrect={false}
+              clearButtonMode={"while-editing"}
+              keyboardType={"web-search"}
+              onBlur={() => setIsEditing(false)}
+              onChangeText={setDraft}
+              onFocus={() => {
+                setIsEditing(true);
+                setDraft(currentUrl ?? "");
+              }}
+              onSubmitEditing={submit}
+              placeholder={"Search or enter website"}
+              placeholderTextColor={colors.secondaryLabel}
+              ref={inputRef}
+              returnKeyType={"go"}
+              selectTextOnFocus={true}
+              style={[styles.addressInput, { color: colors.label }, isEditing ? styles.addressInputEditing : undefined]}
+              value={isEditing ? draft : (host ?? "Search or enter website")}
             />
+            {!isEditing && currentUrl ? (
+              <IconButton
+                accessibilityLabel={isLoading ? "Stop loading" : "Reload page"}
+                color={colors.secondaryLabel}
+                name={isLoading ? "xmark" : "arrow.clockwise"}
+                onPress={isLoading ? onStop : onReload}
+                size={15}
+              />
+            ) : (
+              <View style={styles.addressTrailingSpacer} />
+            )}
           </View>
-        ) : null}
-
-        <View style={[styles.addressBar, { backgroundColor: colors.elevated }]}>
-          <View style={styles.addressLeading}>
-            <IconSymbol
-              color={isInsecureUrl ? colors.danger : colors.secondaryLabel}
-              name={
-                isSecureUrl
-                  ? "lock.fill"
-                  : isInsecureUrl
-                    ? "exclamationmark.triangle.fill"
-                    : currentUrl
-                      ? "globe.americas.fill"
-                      : "magnifyingglass"
-              }
-              size={13}
-            />
-          </View>
-          <TextInput
-            accessibilityLabel={"Address"}
-            autoCapitalize={"none"}
-            autoCorrect={false}
-            clearButtonMode={"while-editing"}
-            keyboardType={"web-search"}
-            onBlur={() => setIsEditing(false)}
-            onChangeText={setDraft}
-            onFocus={() => {
-              setIsEditing(true);
-              setDraft(currentUrl ?? "");
-              requestAnimationFrame(() => inputRef.current?.setSelection(0, (currentUrl ?? "").length));
-            }}
-            onSubmitEditing={submit}
-            placeholder={"Search or enter website"}
-            placeholderTextColor={colors.secondaryLabel}
-            ref={inputRef}
-            returnKeyType={"go"}
-            selectTextOnFocus={true}
-            style={[styles.addressInput, { color: colors.label }]}
-            value={isEditing ? draft : (host ?? "Search or enter website")}
-          />
-          {!isEditing && currentUrl ? (
-            <IconButton
-              accessibilityLabel={isLoading ? "Stop loading" : "Reload page"}
-              color={colors.secondaryLabel}
-              name={"arrow.clockwise"}
-              onPress={onReload}
-              size={15}
-            />
+          {isLoading ? (
+            <View style={[styles.progressTrack, { backgroundColor: colors.glassFill }]}>
+              <View
+                style={[styles.progress, { backgroundColor: colors.accent, width: `${Math.max(6, progress * 100)}%` }]}
+              />
+            </View>
           ) : null}
-          {!isEditing ? (
+        </GlassSurface>
+
+        {isEditing ? (
+          <Pressable accessibilityRole={"button"} onPress={stopEditing} style={styles.cancelButton}>
+            <Text style={[styles.cancelText, { color: colors.accent }]}>Cancel</Text>
+          </Pressable>
+        ) : (
+          <GlassSurface
+            fallbackColor={colors.chrome}
+            interactive={true}
+            style={[styles.speedSurface, { borderColor: colors.glassStroke }]}
+          >
             <Pressable
-              accessibilityLabel={`Speed controls, ${statusLabel}`}
+              accessibilityLabel={`Speed controls, ${speedLabel}`}
               accessibilityRole={"button"}
-              onPress={onSettings}
-              style={({ pressed }) => [
-                styles.speedBadge,
-                { backgroundColor: speedActive ? colors.accent : colors.tertiaryLabel },
-                pressed ? styles.pressed : undefined,
-              ]}
+              onPress={() => {
+                void Haptics.selectionAsync();
+                onSettings();
+              }}
+              style={({ pressed }) => [styles.speedButton, pressed ? styles.pressed : undefined]}
             >
-              <IconSymbol color={"#FFFFFF"} name={"bolt.fill"} size={11} />
-              <Text style={styles.speedBadgeText}>{statusLabel}</Text>
+              <IconSymbol
+                color={speedActive ? colors.accent : colors.secondaryLabel}
+                name={speedActive ? "bolt.fill" : "bolt.slash.fill"}
+                size={14}
+                weight={"semibold"}
+              />
+              <Text style={[styles.speedText, { color: speedActive ? colors.accent : colors.secondaryLabel }]}>
+                {speedLabel}
+              </Text>
             </Pressable>
-          ) : null}
-        </View>
+          </GlassSurface>
+        )}
+      </View>
 
-        <View style={styles.navigationRow}>
-          <IconButton
-            accessibilityLabel={"Back"}
-            color={colors.accent}
-            disabled={!canGoBack}
-            name={"chevron.backward"}
-            onPress={onBack}
-          />
-          <IconButton
-            accessibilityLabel={"Forward"}
-            color={colors.accent}
-            disabled={!canGoForward}
-            name={"chevron.forward"}
-            onPress={onForward}
-          />
-          <IconButton
-            accessibilityLabel={"Share"}
-            color={colors.accent}
-            disabled={!currentUrl}
-            name={"square.and.arrow.up"}
-            onPress={onShare}
-          />
-          <IconButton accessibilityLabel={"Start page"} color={colors.accent} name={"house.fill"} onPress={onHome} />
-          <IconButton
-            accessibilityLabel={"Speed settings"}
-            color={colors.accent}
-            name={"slider.horizontal.3"}
-            onPress={onSettings}
-          />
-        </View>
-      </BlurView>
+      {!isEditing ? (
+        <GlassSurface
+          fallbackColor={colors.chrome}
+          style={[styles.navigationSurface, { borderColor: colors.glassStroke }]}
+        >
+          <View style={styles.navigationRow}>
+            <IconButton
+              accessibilityLabel={"Back"}
+              color={colors.accent}
+              disabled={!canGoBack}
+              name={"chevron.backward"}
+              onPress={onBack}
+            />
+            <IconButton
+              accessibilityLabel={"Forward"}
+              color={colors.accent}
+              disabled={!canGoForward}
+              name={"chevron.forward"}
+              onPress={onForward}
+            />
+            <IconButton
+              accessibilityLabel={"Share"}
+              color={colors.accent}
+              disabled={!currentUrl}
+              name={"square.and.arrow.up"}
+              onPress={onShare}
+            />
+            <IconButton
+              accessibilityLabel={"Start page"}
+              color={colors.accent}
+              name={currentUrl ? "house" : "house.fill"}
+              onPress={onHome}
+              selected={!currentUrl}
+            />
+          </View>
+        </GlassSurface>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  addressBar: {
+  addressContent: {
     alignItems: "center",
-    borderRadius: 12,
+    flex: 1,
     flexDirection: "row",
-    height: 46,
-    marginHorizontal: 10,
-    overflow: "hidden",
-    paddingLeft: 11,
-    paddingRight: 4,
+    minHeight: 50,
   },
   addressInput: {
     flex: 1,
     fontSize: 15,
-    height: 46,
-    paddingHorizontal: 8,
+    fontWeight: "500",
+    height: 50,
+    letterSpacing: -0.1,
+    paddingHorizontal: 6,
     paddingVertical: 0,
     textAlign: "center",
+  },
+  addressInputEditing: {
+    fontWeight: "400",
+    textAlign: "left",
   },
   addressLeading: {
     alignItems: "center",
     justifyContent: "center",
-    width: 18,
+    marginLeft: 13,
+    width: 24,
   },
-  chrome: {
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+  addressRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  addressSurface: {
+    borderRadius: 26,
+    borderWidth: StyleSheet.hairlineWidth,
+    flex: 1,
+    minHeight: 52,
     overflow: "hidden",
-    paddingTop: 10,
+  },
+  addressTrailingSpacer: {
+    marginRight: 8,
+    width: 36,
+  },
+  cancelButton: {
+    alignItems: "center",
+    height: 52,
+    justifyContent: "center",
+    paddingHorizontal: 7,
+  },
+  cancelText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
   container: {
     bottom: 0,
+    gap: 8,
     left: 0,
+    paddingHorizontal: 12,
     position: "absolute",
     right: 0,
   },
   navigationRow: {
     alignItems: "center",
+    flex: 1,
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingHorizontal: 8,
-    paddingTop: 2,
+    paddingHorizontal: 9,
+  },
+  navigationSurface: {
+    alignSelf: "center",
+    borderRadius: 27,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 52,
+    overflow: "hidden",
+    width: 252,
   },
   pressed: {
-    opacity: 0.6,
+    opacity: 0.58,
+    transform: [{ scale: 0.96 }],
   },
   progress: {
     borderRadius: 1,
     height: 2,
   },
   progressTrack: {
+    bottom: 0,
     height: 2,
-    left: 0,
+    left: 16,
     position: "absolute",
-    right: 0,
-    top: 0,
+    right: 16,
   },
-  speedBadge: {
+  speedButton: {
     alignItems: "center",
-    borderRadius: 11,
-    flexDirection: "row",
+    flex: 1,
     gap: 2,
-    height: 24,
     justifyContent: "center",
-    minWidth: 49,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
   },
-  speedBadgeText: {
-    color: "#FFFFFF",
+  speedSurface: {
+    borderRadius: 26,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 52,
+    overflow: "hidden",
+    width: 68,
+  },
+  speedText: {
     fontSize: 10,
     fontWeight: "700",
+    letterSpacing: -0.1,
+    maxWidth: 56,
   },
 });

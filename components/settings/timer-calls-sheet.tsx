@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Modal, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, StyleSheet, Text, View } from "react-native";
 import { Pressable, RectButton, ScrollView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconSymbol } from "@/components/icon-symbol";
+import { GlassSurface } from "@/components/ui/glass-surface";
 import { useAppStore } from "@/store";
 import { useAppColors } from "@/theme/colors";
 import type { TimerCall, TimerCommand } from "@/types/speed";
@@ -43,35 +44,55 @@ export function TimerCallsSheet({ onClose, onCommand, visible }: TimerCallsSheet
 
   return (
     <Modal animationType={"slide"} onRequestClose={onClose} presentationStyle={"pageSheet"} visible={visible}>
-      <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: Math.max(insets.top, 16) }]}>
-        <View style={styles.header}>
+      <View style={[styles.screen, { backgroundColor: colors.background }]}>
+        <GlassSurface fallbackColor={colors.chrome} style={[styles.header, { borderBottomColor: colors.divider }]}>
           <View style={styles.headerSide} />
           <View style={styles.headerTitleWrap}>
             <Text style={[styles.headerTitle, { color: colors.label }]}>Active Timers</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.secondaryLabel }]}> {calls.length} tracked</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.secondaryLabel }]}>
+              {calls.length === 1 ? "1 timer tracked" : `${calls.length} timers tracked`}
+            </Text>
           </View>
-          <Pressable accessibilityRole={"button"} hitSlop={8} onPress={onClose} style={styles.doneButton}>
+          <Pressable
+            accessibilityHint={"Closes active timers"}
+            accessibilityRole={"button"}
+            hitSlop={8}
+            onPress={onClose}
+            style={({ pressed }) => [styles.doneButton, pressed ? styles.pressed : undefined]}
+          >
             <Text style={[styles.doneText, { color: colors.accent }]}>Done</Text>
           </Pressable>
-        </View>
+        </GlassSurface>
 
-        <View style={[styles.segmented, { backgroundColor: colors.elevated }]}>
+        <View
+          accessibilityLabel={"Timer sorting"}
+          accessibilityRole={"tablist"}
+          style={[styles.segmented, { backgroundColor: colors.elevated }]}
+        >
           {(["duration", "recent"] as const).map((mode) => (
             <Pressable
-              accessibilityRole={"button"}
+              accessibilityLabel={mode === "duration" ? "Sort by longest delay" : "Sort by newest"}
+              accessibilityRole={"tab"}
               accessibilityState={{ selected: sortMode === mode }}
               key={mode}
               onPress={() => setSortMode(mode)}
-              style={[styles.segment, sortMode === mode ? { backgroundColor: colors.card } : undefined]}
+              style={({ pressed }) => [
+                styles.segment,
+                sortMode === mode ? { backgroundColor: colors.card } : undefined,
+                pressed ? styles.segmentPressed : undefined,
+              ]}
             >
               <Text style={[styles.segmentText, { color: sortMode === mode ? colors.label : colors.secondaryLabel }]}>
-                {mode === "duration" ? "Longest delay" : "Newest"}
+                {mode === "duration" ? "Longest Delay" : "Newest First"}
               </Text>
             </Pressable>
           ))}
         </View>
 
-        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 20) + 24 }]}>
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}
+          contentInsetAdjustmentBehavior={"automatic"}
+        >
           {visibleCalls.length === 0 ? (
             <View style={styles.empty}>
               <View style={[styles.emptyIcon, { backgroundColor: colors.accentMuted }]}>
@@ -100,8 +121,15 @@ export function TimerCallsSheet({ onClose, onCommand, visible }: TimerCallsSheet
               <Text style={[styles.sectionTitle, { color: colors.secondaryLabel }]}>HIDDEN SOURCES</Text>
               <View style={[styles.sourceGroup, { backgroundColor: colors.card }]}>
                 {hiddenSourceKeys.map((key, index) => (
-                  <RectButton key={key} onPress={() => toggleHiddenSource(key, false)} style={styles.sourceButton}>
+                  <RectButton
+                    key={key}
+                    onPress={() => toggleHiddenSource(key, false)}
+                    style={styles.sourceButton}
+                    underlayColor={colors.elevated}
+                  >
                     <View
+                      accessibilityHint={"Restores timers from this source to the active list"}
+                      accessibilityLabel={`Show ${key}`}
                       accessibilityRole={"button"}
                       style={[
                         styles.sourceRow,
@@ -113,7 +141,10 @@ export function TimerCallsSheet({ onClose, onCommand, visible }: TimerCallsSheet
                       <Text numberOfLines={1} style={[styles.sourceText, { color: colors.label }]}>
                         {key}
                       </Text>
-                      <Text style={[styles.sourceAction, { color: colors.accent }]}>Show</Text>
+                      <View style={styles.sourceActionWrap}>
+                        <Text style={[styles.sourceAction, { color: colors.accent }]}>Show</Text>
+                        <IconSymbol color={colors.tertiaryLabel} name={"chevron.forward"} size={14} />
+                      </View>
                     </View>
                   </RectButton>
                 ))}
@@ -126,8 +157,15 @@ export function TimerCallsSheet({ onClose, onCommand, visible }: TimerCallsSheet
               <Text style={[styles.sectionTitle, { color: colors.secondaryLabel }]}>BLOCKED SOURCES</Text>
               <View style={[styles.sourceGroup, { backgroundColor: colors.card }]}>
                 {disabledSourceKeys.map((key, index) => (
-                  <RectButton key={key} onPress={() => toggleDisabledSource(key, false)} style={styles.sourceButton}>
+                  <RectButton
+                    key={key}
+                    onPress={() => toggleDisabledSource(key, false)}
+                    style={styles.sourceButton}
+                    underlayColor={colors.elevated}
+                  >
                     <View
+                      accessibilityHint={"Allows future timers from this source"}
+                      accessibilityLabel={`Allow ${key}`}
                       accessibilityRole={"button"}
                       style={[
                         styles.sourceRow,
@@ -139,7 +177,10 @@ export function TimerCallsSheet({ onClose, onCommand, visible }: TimerCallsSheet
                       <Text numberOfLines={1} style={[styles.sourceText, { color: colors.label }]}>
                         {key}
                       </Text>
-                      <Text style={[styles.sourceAction, { color: colors.accent }]}>Allow</Text>
+                      <View style={styles.sourceActionWrap}>
+                        <Text style={[styles.sourceAction, { color: colors.accent }]}>Allow</Text>
+                        <IconSymbol color={colors.tertiaryLabel} name={"chevron.forward"} size={14} />
+                      </View>
                     </View>
                   </RectButton>
                 ))}
@@ -166,6 +207,17 @@ function TimerCard({
   const colors = useAppColors();
   const remainingMs = Math.max(0, call.dueAt - now);
 
+  const confirmBlockSource = () => {
+    Alert.alert(
+      "Block This Source?",
+      `Future timers from ${call.sourceLabel} will be blocked until you allow the source again.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Block Source", style: "destructive", onPress: () => onCommand("disable-source", call) },
+      ],
+    );
+  };
+
   return (
     <View style={[styles.card, { backgroundColor: colors.card }]}>
       <View style={styles.cardHeader}>
@@ -178,30 +230,57 @@ function TimerCard({
             {call.sourceLabel}
           </Text>
         </View>
-        <Pressable
+        <RectButton
           accessibilityLabel={"Hide timer source"}
-          accessibilityRole={"button"}
           onPress={onHide}
           style={styles.hideButton}
+          underlayColor={colors.elevated}
         >
-          <Text style={[styles.hideText, { color: colors.secondaryLabel }]}>Hide</Text>
-        </Pressable>
+          <View accessibilityRole={"button"} style={styles.hideButtonContent}>
+            <Text style={[styles.hideText, { color: colors.secondaryLabel }]}>Hide</Text>
+          </View>
+        </RectButton>
       </View>
 
-      <View style={styles.metrics}>
+      <View style={[styles.metrics, { backgroundColor: colors.background }]}>
         <Metric label={"remaining"} value={formatDuration(remainingMs)} />
+        <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
         <Metric label={"delay"} value={formatDuration(call.delay)} />
+        <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
         <Metric label={"speed"} value={`${call.speed}×`} />
       </View>
 
-      <View style={styles.actions}>
-        <ActionButton color={colors.danger} label={"Disable once"} onPress={() => onCommand("disable", call)} />
-        <ActionButton color={colors.danger} label={"Block source"} onPress={() => onCommand("disable-source", call)} />
-        <ActionButton
-          color={colors.accent}
-          label={"Invoke now"}
-          onPress={() => onCommand("invoke", call)}
-          primary={true}
+      <RectButton
+        onPress={() => onCommand("invoke", call)}
+        style={[styles.primaryAction, { backgroundColor: colors.accent }]}
+        underlayColor={colors.accent}
+      >
+        <View
+          accessibilityHint={"Runs this timer immediately"}
+          accessibilityLabel={"Invoke timer now"}
+          accessibilityRole={"button"}
+          style={styles.primaryActionContent}
+        >
+          <IconSymbol color={"#FFFFFF"} name={"bolt.fill"} size={18} />
+          <Text style={styles.primaryActionText}>Invoke Now</Text>
+        </View>
+      </RectButton>
+
+      <View style={[styles.secondaryActions, { borderColor: colors.divider }]}>
+        <TimerActionRow
+          color={colors.danger}
+          hint={"Prevents this occurrence from running"}
+          icon={"xmark.circle.fill"}
+          label={"Disable This Timer"}
+          onPress={() => onCommand("disable", call)}
+        />
+        <View style={[styles.actionDivider, { backgroundColor: colors.divider }]} />
+        <TimerActionRow
+          color={colors.danger}
+          hint={"Asks for confirmation before blocking future timers from this source"}
+          icon={"exclamationmark.triangle.fill"}
+          label={"Block Source…"}
+          onPress={confirmBlockSource}
         />
       </View>
     </View>
@@ -213,34 +292,34 @@ function Metric({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.metric}>
       <Text style={[styles.metricValue, { color: colors.label }]}>{value}</Text>
-      <Text style={[styles.metricLabel, { color: colors.secondaryLabel }]}>{label}</Text>
+      <Text style={[styles.metricLabel, { color: colors.secondaryLabel }]}>{label.toUpperCase()}</Text>
     </View>
   );
 }
 
-function ActionButton({
+function TimerActionRow({
   color,
+  hint,
+  icon,
   label,
   onPress,
-  primary = false,
 }: {
   color: string;
+  hint: string;
+  icon: string;
   label: string;
   onPress: () => void;
-  primary?: boolean;
 }) {
+  const colors = useAppColors();
+
   return (
-    <Pressable
-      accessibilityRole={"button"}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.action,
-        { backgroundColor: primary ? color : "transparent", borderColor: color },
-        pressed ? styles.pressed : undefined,
-      ]}
-    >
-      <Text style={[styles.actionText, { color: primary ? "#FFFFFF" : color }]}>{label}</Text>
-    </Pressable>
+    <RectButton onPress={onPress} style={styles.actionRowButton} underlayColor={colors.elevated}>
+      <View accessibilityHint={hint} accessibilityRole={"button"} style={styles.actionRow}>
+        <IconSymbol color={color} name={icon} size={18} />
+        <Text style={[styles.actionRowText, { color }]}>{label}</Text>
+        <IconSymbol color={colors.tertiaryLabel} name={"chevron.forward"} size={14} />
+      </View>
+    </RectButton>
   );
 }
 
@@ -257,27 +336,29 @@ function formatDuration(milliseconds: number): string {
 }
 
 const styles = StyleSheet.create({
-  action: {
+  actionDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 46,
+  },
+  actionRow: {
     alignItems: "center",
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 39,
-    paddingHorizontal: 6,
-  },
-  actionText: {
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  actions: {
     flexDirection: "row",
-    gap: 7,
+    gap: 10,
+    minHeight: 47,
+    paddingHorizontal: 14,
+  },
+  actionRowButton: {
+    backgroundColor: "transparent",
+  },
+  actionRowText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "500",
   },
   card: {
     borderRadius: 15,
-    marginBottom: 10,
+    marginBottom: 12,
+    overflow: "hidden",
     padding: 14,
   },
   cardHeader: {
@@ -290,7 +371,8 @@ const styles = StyleSheet.create({
     paddingRight: 10,
   },
   content: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
   doneButton: {
     alignItems: "flex-end",
@@ -305,7 +387,7 @@ const styles = StyleSheet.create({
   empty: {
     alignItems: "center",
     paddingHorizontal: 34,
-    paddingVertical: 58,
+    paddingVertical: 44,
   },
   emptyBody: {
     fontSize: 14,
@@ -336,8 +418,9 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
-    height: 50,
+    height: 54,
     justifyContent: "space-between",
     paddingHorizontal: 16,
   },
@@ -356,30 +439,66 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   hideButton: {
-    minHeight: 30,
-    paddingHorizontal: 4,
+    backgroundColor: "transparent",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  hideButtonContent: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 36,
+    minWidth: 48,
   },
   hideText: {
     fontSize: 12,
     fontWeight: "600",
   },
   metric: {
+    alignItems: "center",
     flex: 1,
   },
+  metricDivider: {
+    height: 28,
+    width: StyleSheet.hairlineWidth,
+  },
   metricLabel: {
-    fontSize: 11,
-    marginTop: 1,
+    fontSize: 9,
+    fontWeight: "500",
+    letterSpacing: 0.35,
+    marginTop: 2,
   },
   metricValue: {
-    fontSize: 14,
+    fontSize: 15,
+    fontVariant: ["tabular-nums"],
     fontWeight: "600",
   },
   metrics: {
+    alignItems: "center",
+    borderRadius: 11,
     flexDirection: "row",
-    marginVertical: 14,
+    marginBottom: 12,
+    marginTop: 13,
+    minHeight: 55,
   },
   pressed: {
     opacity: 0.55,
+  },
+  primaryAction: {
+    borderRadius: 11,
+    overflow: "hidden",
+  },
+  primaryActionContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 7,
+    justifyContent: "center",
+    minHeight: 46,
+    paddingHorizontal: 14,
+  },
+  primaryActionText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
   screen: {
     flex: 1,
@@ -395,8 +514,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 8,
     flex: 1,
-    height: 32,
+    height: 30,
     justifyContent: "center",
+  },
+  segmentPressed: {
+    opacity: 0.65,
   },
   segmentText: {
     fontSize: 13,
@@ -407,8 +529,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 2,
     marginHorizontal: 16,
-    marginTop: 8,
+    marginTop: 10,
     padding: 2,
+  },
+  secondaryActions: {
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: 10,
+    overflow: "hidden",
   },
   source: {
     fontFamily: "Courier",
@@ -418,6 +546,11 @@ const styles = StyleSheet.create({
   sourceAction: {
     fontSize: 15,
     fontWeight: "600",
+  },
+  sourceActionWrap: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5,
   },
   sourceButton: {
     backgroundColor: "transparent",

@@ -11,6 +11,7 @@ import { BrowserToolbar } from "@/components/browser/browser-toolbar";
 import { StartPage } from "@/components/browser/start-page";
 import { SpeedSettingsSheet } from "@/components/settings/speed-settings-sheet";
 import { TimerCallsSheet } from "@/components/settings/timer-calls-sheet";
+import { GlassSurface } from "@/components/ui/glass-surface";
 import { buildConfigUpdateScript, buildSpeedInjectionScript, buildTimerCommandScript } from "@/services/speed-script";
 import { useAppStore } from "@/store";
 import { useAppColors } from "@/theme/colors";
@@ -74,7 +75,6 @@ export function BrowserScreen() {
   const [currentUrl, setCurrentUrl] = useState<string | null>(null);
   const [navigation, setNavigation] = useState(INITIAL_NAVIGATION_STATE);
   const [progress, setProgress] = useState(0);
-  const [addressFocusRequest, setAddressFocusRequest] = useState(0);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [timerCallsVisible, setTimerCallsVisible] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -173,7 +173,6 @@ export function BrowserScreen() {
 
   const toolbar = (
     <BrowserToolbar
-      addressFocusRequest={addressFocusRequest}
       canGoBack={navigation.canGoBack}
       canGoForward={navigation.canGoForward}
       config={config}
@@ -186,6 +185,7 @@ export function BrowserScreen() {
       onReload={() => webViewRef.current?.reload()}
       onSettings={() => setSettingsVisible(true)}
       onShare={shareCurrentPage}
+      onStop={() => webViewRef.current?.stopLoading()}
       progress={progress}
     />
   );
@@ -199,7 +199,7 @@ export function BrowserScreen() {
           allowsInlineMediaPlayback={true}
           applicationNameForUserAgent={"SpeedBrowser/1.0"}
           automaticallyAdjustContentInsets={false}
-          contentInset={{ bottom: 112, left: 0, right: 0, top: 0 }}
+          contentInset={{ bottom: 148, left: 0, right: 0, top: 0 }}
           decelerationRate={"normal"}
           injectedJavaScriptBeforeContentLoaded={injectionScript}
           injectedJavaScriptBeforeContentLoadedForMainFrameOnly={true}
@@ -225,15 +225,11 @@ export function BrowserScreen() {
           style={styles.webView}
         />
       ) : (
-        <StartPage
-          onNavigate={navigate}
-          onOpenAddress={() => setAddressFocusRequest((request) => request + 1)}
-          recentUrls={recentUrls}
-        />
+        <StartPage onNavigate={navigate} recentUrls={recentUrls} />
       )}
 
       {pageError ? (
-        <View style={[styles.errorCard, { backgroundColor: colors.card }]}>
+        <GlassSurface fallbackColor={colors.card} style={[styles.errorCard, { borderColor: colors.glassStroke }]}>
           <Text style={[styles.errorTitle, { color: colors.label }]}>This page couldn’t load.</Text>
           <Text style={[styles.errorDetail, { color: colors.secondaryLabel }]}>{pageError}</Text>
           <Pressable
@@ -246,7 +242,7 @@ export function BrowserScreen() {
           >
             <Text style={styles.retryText}>Try Again</Text>
           </Pressable>
-        </View>
+        </GlassSurface>
       ) : null}
 
       {toolbar}
@@ -331,6 +327,7 @@ function getUrlScheme(url: string): string | null {
 const styles = StyleSheet.create({
   errorCard: {
     borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
     left: 24,
     padding: 20,
     position: "absolute",

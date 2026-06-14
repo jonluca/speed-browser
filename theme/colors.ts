@@ -9,6 +9,8 @@ export interface AppColors {
   danger: string;
   divider: string;
   elevated: string;
+  glassFill: string;
+  glassStroke: string;
   label: string;
   secondaryLabel: string;
   tertiaryLabel: string;
@@ -23,6 +25,8 @@ const lightColors: AppColors = {
   danger: "#FF3B30",
   divider: "rgba(60, 60, 67, 0.18)",
   elevated: "#E9E9EE",
+  glassFill: "rgba(120, 120, 128, 0.16)",
+  glassStroke: "rgba(255, 255, 255, 0.72)",
   label: "#000000",
   secondaryLabel: "rgba(60, 60, 67, 0.72)",
   tertiaryLabel: "rgba(60, 60, 67, 0.42)",
@@ -37,6 +41,8 @@ const darkColors: AppColors = {
   danger: "#FF453A",
   divider: "rgba(84, 84, 88, 0.58)",
   elevated: "#2C2C2E",
+  glassFill: "rgba(120, 120, 128, 0.24)",
+  glassStroke: "rgba(255, 255, 255, 0.16)",
   label: "#FFFFFF",
   secondaryLabel: "rgba(235, 235, 245, 0.68)",
   tertiaryLabel: "rgba(235, 235, 245, 0.34)",

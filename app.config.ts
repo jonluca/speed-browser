@@ -15,7 +15,7 @@ const getConfig = ({ config }: ConfigContext): ExpoConfig => ({
     ...config.ios,
     supportsTablet: false,
     bundleIdentifier: "com.jonluca.speedbrowser",
-    buildNumber: "1",
+    buildNumber: "2",
     appleTeamId: "F35YQQ5672",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,

@@ -4,54 +4,54 @@ import { Pressable, RectButton, ScrollView } from "react-native-gesture-handler"
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import speedBrowserIcon from "@/assets/images/splash.png";
-import { IconSymbol } from "@/components/icon-symbol";
+import { IconSymbol, type IconSymbolName } from "@/components/icon-symbol";
+import { GlassSurface } from "@/components/ui/glass-surface";
 import { useAppColors } from "@/theme/colors";
 import { getHostname } from "@/utils/speed-config";
 
-const FAVORITES = [
-  { label: "Google", url: "https://www.google.com" },
-  { label: "Wikipedia", url: "https://www.wikipedia.org" },
-  { label: "GitHub", url: "https://github.com" },
-  { label: "Hacker News", url: "https://news.ycombinator.com" },
-] as const;
+const FAVORITES: ReadonlyArray<{
+  color?: string;
+  icon: IconSymbolName;
+  label: string;
+  url: string;
+}> = [
+  { color: "#4285F4", icon: "magnifyingglass", label: "Google", url: "https://www.google.com" },
+  { color: "#5C5C62", icon: "book.closed.fill", label: "Wikipedia", url: "https://www.wikipedia.org" },
+  {
+    icon: "chevron.left.forwardslash.chevron.right",
+    label: "GitHub",
+    url: "https://github.com",
+  },
+  { color: "#F47B20", icon: "newspaper.fill", label: "Hacker News", url: "https://news.ycombinator.com" },
+];
 
 interface StartPageProps {
   onNavigate: (url: string) => void;
-  onOpenAddress: () => void;
   recentUrls: string[];
 }
 
-export function StartPage({ onNavigate, onOpenAddress, recentUrls }: StartPageProps) {
+export function StartPage({ onNavigate, recentUrls }: StartPageProps) {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
 
   return (
     <ScrollView
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 150, paddingTop: insets.top + 34 }]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 154 }]}
       keyboardDismissMode={"interactive"}
       style={{ backgroundColor: colors.background }}
     >
-      <View style={styles.hero}>
+      <View style={styles.header}>
         <Image contentFit={"contain"} source={speedBrowserIcon} style={styles.logo} />
-        <Text style={[styles.title, { color: colors.label }]}>Speed Browser</Text>
-        <Text style={[styles.subtitle, { color: colors.secondaryLabel }]}>The web, with fewer artificial waits.</Text>
+        <View style={styles.headerCopy}>
+          <Text style={[styles.title, { color: colors.label }]}>Speed Browser</Text>
+          <Text style={[styles.subtitle, { color: colors.secondaryLabel }]}>The web, without the waiting.</Text>
+        </View>
       </View>
 
-      <Pressable
-        accessibilityLabel={"Search or enter website name"}
-        accessibilityRole={"button"}
-        onPress={onOpenAddress}
-        style={({ pressed }) => [
-          styles.search,
-          { backgroundColor: colors.card, borderColor: colors.divider },
-          pressed ? styles.pressed : undefined,
-        ]}
-      >
-        <IconSymbol color={colors.secondaryLabel} name={"magnifyingglass"} size={18} />
-        <Text style={[styles.searchPlaceholder, { color: colors.secondaryLabel }]}>Search or enter website name</Text>
-      </Pressable>
-
-      <Text style={[styles.sectionTitle, { color: colors.label }]}>Favorites</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.label }]}>Favorites</Text>
+        <Text style={[styles.sectionHint, { color: colors.secondaryLabel }]}>Tap the address bar to search</Text>
+      </View>
       <View style={styles.favorites}>
         {FAVORITES.map((favorite) => (
           <Pressable
@@ -61,9 +61,13 @@ export function StartPage({ onNavigate, onOpenAddress, recentUrls }: StartPagePr
             onPress={() => onNavigate(favorite.url)}
             style={({ pressed }) => [styles.favorite, pressed ? styles.pressed : undefined]}
           >
-            <View style={[styles.favoriteIcon, { backgroundColor: colors.card, borderColor: colors.divider }]}>
-              <IconSymbol color={colors.accent} name={"globe.americas.fill"} size={28} />
-            </View>
+            <GlassSurface
+              fallbackColor={colors.card}
+              interactive={true}
+              style={[styles.favoriteIcon, { borderColor: colors.glassStroke }]}
+            >
+              <IconSymbol color={favorite.color ?? colors.label} name={favorite.icon} size={24} weight={"semibold"} />
+            </GlassSurface>
             <Text numberOfLines={1} style={[styles.favoriteLabel, { color: colors.label }]}>
               {favorite.label}
             </Text>
@@ -71,134 +75,185 @@ export function StartPage({ onNavigate, onOpenAddress, recentUrls }: StartPagePr
         ))}
       </View>
 
-      {recentUrls.length > 0 ? (
-        <View style={styles.recentSection}>
-          <Text style={[styles.sectionTitle, { color: colors.label }]}>Recently Visited</Text>
-          <View style={[styles.recentCard, { backgroundColor: colors.card }]}>
-            {recentUrls.slice(0, 5).map((url, index) => (
-              <RectButton key={url} onPress={() => onNavigate(url)} style={styles.recentButton}>
-                <View
-                  accessibilityLabel={`Open ${getHostname(url) ?? url}`}
-                  accessibilityRole={"button"}
-                  style={[
-                    styles.recentRow,
-                    index > 0 ? { borderColor: colors.divider, borderTopWidth: StyleSheet.hairlineWidth } : undefined,
-                  ]}
-                >
-                  <IconSymbol color={colors.accent} name={"link"} size={17} />
-                  <View style={styles.recentText}>
-                    <Text numberOfLines={1} style={[styles.recentHost, { color: colors.label }]}>
-                      {getHostname(url) ?? url}
-                    </Text>
-                    <Text numberOfLines={1} style={[styles.recentUrl, { color: colors.secondaryLabel }]}>
-                      {url}
-                    </Text>
-                  </View>
+      <Text style={[styles.sectionTitle, styles.recentTitle, { color: colors.label }]}>Recently Visited</Text>
+      <GlassSurface fallbackColor={colors.card} style={[styles.recentSurface, { borderColor: colors.glassStroke }]}>
+        {recentUrls.length > 0 ? (
+          recentUrls.slice(0, 6).map((url, index) => (
+            <RectButton key={url} onPress={() => onNavigate(url)} style={styles.recentButton}>
+              <View
+                accessibilityLabel={`Open ${getHostname(url) ?? url}`}
+                accessibilityRole={"button"}
+                style={[
+                  styles.recentRow,
+                  index > 0 ? { borderColor: colors.divider, borderTopWidth: StyleSheet.hairlineWidth } : undefined,
+                ]}
+              >
+                <View style={[styles.recentIcon, { backgroundColor: colors.accentMuted }]}>
+                  <IconSymbol color={colors.accent} name={"globe"} size={16} weight={"semibold"} />
                 </View>
-              </RectButton>
-            ))}
+                <View style={styles.recentText}>
+                  <Text numberOfLines={1} style={[styles.recentHost, { color: colors.label }]}>
+                    {getHostname(url) ?? url}
+                  </Text>
+                  <Text numberOfLines={1} style={[styles.recentUrl, { color: colors.secondaryLabel }]}>
+                    {url}
+                  </Text>
+                </View>
+                <IconSymbol color={colors.tertiaryLabel} name={"chevron.forward"} size={12} weight={"semibold"} />
+              </View>
+            </RectButton>
+          ))
+        ) : (
+          <View style={styles.emptyRecent}>
+            <View style={[styles.emptyIcon, { backgroundColor: colors.accentMuted }]}>
+              <IconSymbol color={colors.accent} name={"hand.raised.fill"} size={20} />
+            </View>
+            <View style={styles.emptyCopy}>
+              <Text style={[styles.emptyTitle, { color: colors.label }]}>Ready when you are</Text>
+              <Text style={[styles.emptyBody, { color: colors.secondaryLabel }]}>
+                Pages you visit will appear here. Browsing stays on this device.
+              </Text>
+            </View>
           </View>
-        </View>
-      ) : null}
+        )}
+      </GlassSurface>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   content: {
-    paddingHorizontal: 22,
+    paddingHorizontal: 20,
+    paddingTop: 28,
+  },
+  emptyBody: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  emptyCopy: {
+    flex: 1,
+  },
+  emptyIcon: {
+    alignItems: "center",
+    borderRadius: 19,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  emptyRecent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    minHeight: 88,
+    paddingHorizontal: 16,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: "600",
   },
   favorite: {
     alignItems: "center",
-    gap: 7,
-    width: "22%",
+    gap: 8,
+    width: "23%",
   },
   favoriteIcon: {
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
-    height: 62,
+    height: 64,
     justifyContent: "center",
-    boxShadow: "0 1px 4px rgba(0, 0, 0, 0.08)",
-    width: 62,
+    overflow: "hidden",
+    width: 64,
   },
   favoriteLabel: {
     fontSize: 12,
-    maxWidth: 80,
+    letterSpacing: -0.1,
+    maxWidth: 82,
   },
   favorites: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 34,
+    marginBottom: 36,
   },
-  hero: {
+  header: {
     alignItems: "center",
-    marginBottom: 26,
+    flexDirection: "row",
+    marginBottom: 38,
+    paddingHorizontal: 4,
+  },
+  headerCopy: {
+    flex: 1,
   },
   logo: {
-    borderRadius: 22,
-    height: 84,
-    marginBottom: 14,
-    width: 84,
+    borderRadius: 13,
+    height: 52,
+    marginRight: 13,
+    width: 52,
   },
   pressed: {
-    opacity: 0.58,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.6,
+    transform: [{ scale: 0.96 }],
   },
   recentButton: {
     backgroundColor: "transparent",
   },
-  recentCard: {
-    borderRadius: 14,
-    overflow: "hidden",
-  },
   recentHost: {
     fontSize: 15,
     fontWeight: "600",
+    letterSpacing: -0.15,
+  },
+  recentIcon: {
+    alignItems: "center",
+    borderRadius: 17,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
   },
   recentRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 12,
-    marginLeft: 15,
-    minHeight: 58,
-    paddingRight: 14,
+    gap: 11,
+    marginLeft: 14,
+    minHeight: 61,
+    paddingRight: 15,
   },
-  recentSection: {
-    marginTop: 4,
+  recentSurface: {
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
   },
   recentText: {
     flex: 1,
   },
+  recentTitle: {
+    marginBottom: 12,
+  },
   recentUrl: {
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 2,
   },
-  search: {
-    alignItems: "center",
-    borderRadius: 13,
-    borderWidth: StyleSheet.hairlineWidth,
+  sectionHeader: {
+    alignItems: "baseline",
     flexDirection: "row",
-    gap: 8,
-    height: 48,
-    marginBottom: 28,
-    paddingHorizontal: 14,
+    justifyContent: "space-between",
+    marginBottom: 14,
   },
-  searchPlaceholder: {
-    fontSize: 16,
+  sectionHint: {
+    fontSize: 12,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
-    marginBottom: 13,
+    letterSpacing: -0.35,
   },
   subtitle: {
-    fontSize: 15,
-    marginTop: 5,
+    fontSize: 14,
+    marginTop: 3,
   },
   title: {
-    fontSize: 28,
+    fontSize: 27,
     fontWeight: "700",
-    letterSpacing: -0.5,
+    letterSpacing: -0.7,
   },
 });

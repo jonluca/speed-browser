@@ -15,7 +15,8 @@
     "lint:fix": "oxlint --fix . && oxfmt --write .",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check",
     "mobile:prepare": "expo prebuild --clean",
-    "mobile:submit": "eas build --platform ios --auto-submit --non-interactive"
+    "mobile:build": "eas build --platform ios --profile production --non-interactive",
+    "mobile:submit": "asc publish appstore --app 6780292838 --ipa \"${IPA_PATH:?Set IPA_PATH to the EAS-built .ipa}\" --metadata-dir ./metadata --wait --submit --confirm"
   },
   "dependencies": {
     "@babel/core": "^7.29.7",

@@ -15,7 +15,6 @@ const getConfig = ({ config }: ConfigContext): ExpoConfig => ({
     ...config.ios,
     supportsTablet: false,
     bundleIdentifier: "com.jonluca.speedbrowser",
-    buildNumber: "2",
     appleTeamId: "F35YQQ5672",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -74,6 +73,12 @@ const getConfig = ({ config }: ConfigContext): ExpoConfig => ({
   experiments: {
     typedRoutes: true,
     reactCompiler: true,
+  },
+  extra: {
+    ...config.extra,
+    eas: {
+      projectId: "96001efc-45a2-4466-bf5c-8b581020d805",
+    },
   },
   owner: "jonluca",
 });

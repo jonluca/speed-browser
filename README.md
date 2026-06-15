@@ -32,6 +32,20 @@ Generate native projects from the Expo configuration:
 pnpm mobile:prepare
 ```
 
+Production iOS builds run on EAS. EAS stores and increments the build number remotely, so it is not tracked in the app configuration:
+
+```sh
+pnpm mobile:build
+```
+
+Download the completed EAS build, then upload and submit the IPA with `asc`:
+
+```sh
+eas build:view "EAS_BUILD_ID"
+curl -fL "APPLICATION_ARCHIVE_URL" -o .asc/artifacts/SpeedBrowser.ipa
+IPA_PATH=.asc/artifacts/SpeedBrowser.ipa pnpm mobile:submit
+```
+
 The deterministic acceleration fixture used for simulator verification lives at [`fixtures/timer-test.html`](fixtures/timer-test.html). With the fixture served locally, its 4,000ms timeout completes in about 2,000ms at 2×. It also reports completion times for CSS and Web Animations so their independent settings can be checked.
 
 ## Architecture

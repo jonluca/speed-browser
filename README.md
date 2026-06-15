@@ -1,16 +1,20 @@
 # Speed Browser
 
-Speed Browser is an iOS-first React Native browser that can accelerate JavaScript timers inside the pages you visit. It is built with Expo using the architecture and tooling conventions from Palate.
+Speed Browser is an iOS-first React Native browser that can accelerate timers, animations, and media inside the pages you visit. It is built with Expo using the architecture and tooling conventions from Palate.
 
 ## What it speeds up
 
 - `setTimeout`
 - `setInterval`
 - `requestAnimationFrame` callback timestamps
+- CSS transitions, CSS animations, and Web Animations API playback
+- HTML audio and video playback
 
-The app does not speed up network requests, media playback, CSS animations, or browser-native work. At high multipliers, some pages may behave unexpectedly; acceleration can be paused globally, disabled per site, or enabled independently for each wrapped API.
+Every acceleration type has its own on/off toggle and multiplier. Timers and animations range from 1× to 100×; media ranges from 1× to 16× and may be limited further by the webpage or WebKit. Timer acceleration is enabled by default, while animation-frame, Web animation, and media acceleration are opt-in.
 
-Manual mode exposes active timeouts and intervals. You can pause invocations, invoke a timer immediately, disable one call, block a source location, or hide noisy sources.
+The app does not speed up network requests, downloads, or browser-native work. At high multipliers, some pages may behave unexpectedly; acceleration can be paused globally or disabled per site. Turning a type off immediately restores the page's authored animation or media playback rate.
+
+Manual mode exposes active timeouts and intervals. You can pause invocations, invoke a timer immediately, disable one call, block a source location, or hide noisy sources. Animation and media acceleration continue at their configured rates while timer invocations are under manual control.
 
 ## Development
 
@@ -28,7 +32,7 @@ Generate native projects from the Expo configuration:
 pnpm mobile:prepare
 ```
 
-The deterministic timer fixture used for simulator verification lives at [`fixtures/timer-test.html`](fixtures/timer-test.html). With the fixture served locally, its 4,000ms timeout completes in about 2,000ms at the default 2× speed.
+The deterministic acceleration fixture used for simulator verification lives at [`fixtures/timer-test.html`](fixtures/timer-test.html). With the fixture served locally, its 4,000ms timeout completes in about 2,000ms at 2×. It also reports completion times for CSS and Web Animations so their independent settings can be checked.
 
 ## Architecture
 

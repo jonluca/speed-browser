@@ -16,7 +16,7 @@ const FAVORITES: ReadonlyArray<{
   url: string;
 }> = [
   { color: "#4285F4", icon: "magnifyingglass", label: "Google", url: "https://www.google.com" },
-  { color: "#5C5C62", icon: "book.closed.fill", label: "Wikipedia", url: "https://www.wikipedia.org" },
+  { icon: "book.closed.fill", label: "Wikipedia", url: "https://www.wikipedia.org" },
   {
     icon: "chevron.left.forwardslash.chevron.right",
     label: "GitHub",

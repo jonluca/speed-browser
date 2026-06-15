@@ -24,10 +24,9 @@ export function GlassSurface({
       glassEffectStyle={LIQUID_GLASS_AVAILABLE ? variant : "none"}
       isInteractive={interactive}
       style={[{ backgroundColor: LIQUID_GLASS_AVAILABLE ? "transparent" : fallbackColor }, style]}
+      tintColor={LIQUID_GLASS_AVAILABLE ? fallbackColor : undefined}
     >
       {children}
     </GlassView>
   );
 }
-
-export const hasLiquidGlass = LIQUID_GLASS_AVAILABLE;

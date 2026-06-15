@@ -2,7 +2,7 @@ import * as Linking from "expo-linking";
 import { randomUUID } from "expo-crypto";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Share, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Share, StyleSheet, Text, View } from "react-native";
 import { Pressable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView, type WebViewMessageEvent, type WebViewNavigation } from "react-native-webview";
@@ -16,7 +16,7 @@ import { buildConfigUpdateScript, buildSpeedInjectionScript, buildTimerCommandSc
 import { useAppStore } from "@/store";
 import { useAppColors } from "@/theme/colors";
 import type { SpeedStats, TimerCall, TimerCommand } from "@/types/speed";
-import { getHostname } from "@/utils/speed-config";
+import { getHostname, isAccelerationType } from "@/utils/speed-config";
 
 interface BrowserNavigationState {
   canGoBack: boolean;
@@ -78,6 +78,7 @@ export function BrowserScreen() {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [timerCallsVisible, setTimerCallsVisible] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
+  const toolbarInset = 112 + Math.max(insets.bottom, 8);
 
   const injectionScript = buildSpeedInjectionScript({ bridgeToken: BRIDGE_TOKEN, config, disabledSourceKeys });
 
@@ -199,7 +200,7 @@ export function BrowserScreen() {
           allowsInlineMediaPlayback={true}
           applicationNameForUserAgent={"SpeedBrowser/1.0"}
           automaticallyAdjustContentInsets={false}
-          contentInset={{ bottom: 148, left: 0, right: 0, top: 0 }}
+          contentInset={{ bottom: toolbarInset, left: 0, right: 0, top: 0 }}
           decelerationRate={"normal"}
           injectedJavaScriptBeforeContentLoaded={injectionScript}
           injectedJavaScriptBeforeContentLoadedForMainFrameOnly={true}
@@ -218,11 +219,16 @@ export function BrowserScreen() {
           originWhitelist={["*"]}
           pullToRefreshEnabled={true}
           ref={webViewRef}
+          renderError={() => <View style={[styles.webView, { backgroundColor: colors.background }]} />}
           setSupportMultipleWindows={false}
           sharedCookiesEnabled={true}
           source={{ uri: sourceUrl }}
           startInLoadingState={true}
-          style={styles.webView}
+          style={[
+            styles.webView,
+            Platform.OS === "android" ? { marginBottom: toolbarInset } : undefined,
+            pageError ? styles.failedWebView : undefined,
+          ]}
         />
       ) : (
         <StartPage onNavigate={navigate} recentUrls={recentUrls} />
@@ -274,10 +280,7 @@ function isSpeedStats(value: unknown): value is Partial<SpeedStats> {
   }
 
   const keys = Object.keys(value);
-  return (
-    keys.every((key) => key === "requestAnimationFrame" || key === "setInterval" || key === "setTimeout") &&
-    Object.values(value).every(isStatIncrement)
-  );
+  return keys.every(isAccelerationType) && Object.values(value).every(isStatIncrement);
 }
 
 function isStatIncrement(value: unknown): value is number {
@@ -342,6 +345,9 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 19,
     fontWeight: "700",
+  },
+  failedWebView: {
+    opacity: 0,
   },
   retryButton: {
     alignItems: "center",

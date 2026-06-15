@@ -29,25 +29,34 @@ import {
   tag,
   tint,
 } from "@expo/ui/swift-ui/modifiers";
+import { Fragment } from "react";
 import { Alert, Modal, StyleSheet, useColorScheme } from "react-native";
 
 import { useAppStore } from "@/store";
 import { useAppColors } from "@/theme/colors";
-import { SPEED_FUNCTIONS, type SpeedFunctionName } from "@/types/speed";
+import { ACCELERATION_TYPES, type AccelerationType } from "@/types/speed";
 import { MAX_SPEED, MIN_SPEED, QUICK_SPEEDS, formatSpeed, isHostExcluded } from "@/utils/speed-config";
 
-const FUNCTION_LABELS: Record<SpeedFunctionName, { description: string; title: string }> = {
+const ACCELERATION_COPY: Record<AccelerationType, { description: string; title: string }> = {
+  mediaPlayback: {
+    description: "Audio and video playback",
+    title: "Audio & video",
+  },
   requestAnimationFrame: {
-    description: "Advances animation timestamps at the display's native frame rate.",
+    description: "Frame timestamps",
     title: "Animation frames",
   },
   setInterval: {
-    description: "Shortens repeating JavaScript timer intervals.",
+    description: "Repeating JavaScript timers",
     title: "Intervals",
   },
   setTimeout: {
-    description: "Shortens one-time JavaScript timer delays.",
+    description: "One-time JavaScript timers",
     title: "Timeouts",
+  },
+  webAnimations: {
+    description: "CSS and Web Animations",
+    title: "Web animations",
   },
 };
 
@@ -70,17 +79,25 @@ export function SpeedSettingsSheet({ currentHost, onClose, onOpenTimerCalls, vis
   const timerCallCount = useAppStore((state) => state.timerCalls.length);
   const clearBrowsingData = useAppStore((state) => state.clearBrowsingData);
   const setEnabled = useAppStore((state) => state.setEnabled);
-  const setFunctionEnabled = useAppStore((state) => state.setFunctionEnabled);
+  const setAccelerationEnabled = useAppStore((state) => state.setAccelerationEnabled);
+  const setAccelerationSpeed = useAppStore((state) => state.setAccelerationSpeed);
   const setHostExcluded = useAppStore((state) => state.setHostExcluded);
   const setMode = useAppStore((state) => state.setMode);
   const setPauseInvocations = useAppStore((state) => state.setPauseInvocations);
-  const setSpeed = useAppStore((state) => state.setSpeed);
   const resetConfig = useAppStore((state) => state.resetConfig);
   const resetStats = useAppStore((state) => state.resetStats);
 
-  const currentSpeedIsPreset = QUICK_SPEEDS.some((speed) => speed === config.speed);
-  const speedOptions = currentSpeedIsPreset ? QUICK_SPEEDS : [config.speed, ...QUICK_SPEEDS];
-  const status = !config.enabled ? "Off" : config.mode === "manual" ? "Manual" : formatSpeed(config.speed);
+  const activeAccelerations = ACCELERATION_TYPES.filter((type) => config.accelerations[type].enabled);
+  const activeSpeeds = new Set(activeAccelerations.map((type) => config.accelerations[type].speed));
+  const status = !config.enabled
+    ? "Off"
+    : activeAccelerations.length === 0
+      ? "No types enabled"
+      : config.mode === "manual"
+        ? "Manual timers"
+        : activeSpeeds.size === 1
+          ? formatSpeed(config.accelerations[activeAccelerations[0]].speed)
+          : "Mixed speeds";
 
   const confirmResetStats = () => {
     Alert.alert("Reset session counters?", "Timer trigger counts for this browsing session will return to zero.", [
@@ -90,10 +107,14 @@ export function SpeedSettingsSheet({ currentHost, onClose, onOpenTimerCalls, vis
   };
 
   const confirmResetConfig = () => {
-    Alert.alert("Restore default settings?", "Speed, mode, website exclusions, and timer API settings will be reset.", [
-      { style: "cancel", text: "Cancel" },
-      { onPress: resetConfig, style: "destructive", text: "Restore Defaults" },
-    ]);
+    Alert.alert(
+      "Restore default settings?",
+      "Speeds, mode, website exclusions, and acceleration types will be reset.",
+      [
+        { style: "cancel", text: "Cancel" },
+        { onPress: resetConfig, style: "destructive", text: "Restore Defaults" },
+      ],
+    );
   };
 
   const confirmClearBrowsingData = () => {
@@ -138,7 +159,7 @@ export function SpeedSettingsSheet({ currentHost, onClose, onOpenTimerCalls, vis
               <Toggle
                 isOn={config.enabled}
                 label={"Enable acceleration"}
-                modifiers={[accessibilityHint("Speeds up supported JavaScript timers on webpages")]}
+                modifiers={[accessibilityHint("Speeds up enabled timers, animations, and media on webpages")]}
                 onIsOnChange={setEnabled}
                 systemImage={"bolt.fill"}
               />
@@ -148,9 +169,7 @@ export function SpeedSettingsSheet({ currentHost, onClose, onOpenTimerCalls, vis
             </Section>
 
             <Section
-              footer={
-                <Text>Automatic speeds up enabled APIs. Manual lets you inspect and invoke individual timers.</Text>
-              }
+              footer={<Text>Manual mode lets you inspect timers. Animation and media speeds still apply.</Text>}
               title={"Mode"}
             >
               <Picker
@@ -170,7 +189,7 @@ export function SpeedSettingsSheet({ currentHost, onClose, onOpenTimerCalls, vis
 
             {currentHost ? (
               <Section
-                footer={<Text>Leave this off to use your global speed settings on this website.</Text>}
+                footer={<Text>Leave this off to use your global acceleration settings on this website.</Text>}
                 title={"This Website"}
               >
                 <Toggle
@@ -190,62 +209,67 @@ export function SpeedSettingsSheet({ currentHost, onClose, onOpenTimerCalls, vis
             <Section
               footer={
                 <Text>
-                  Choose from {MIN_SPEED}x to {MAX_SPEED}x in 0.25x steps. Very high speeds can affect some websites.
+                  Set each type independently from {MIN_SPEED}× to {MAX_SPEED}×. Media playback tops out at 16×.
                 </Text>
               }
-              title={"Speed"}
+              title={"Acceleration Types"}
             >
-              <LabeledContent label={"Current speed"}>
-                <Text modifiers={[bold(), monospacedDigit()]}>{formatSpeed(config.speed)}</Text>
-              </LabeledContent>
-              <Stepper
-                label={"Adjust speed"}
-                max={MAX_SPEED * SPEED_SCALE}
-                min={MIN_SPEED * SPEED_SCALE}
-                modifiers={[
-                  accessibilityLabel("Speed multiplier"),
-                  accessibilityValue(formatSpeed(config.speed)),
-                  accessibilityHint("Adjusts speed in quarter-step increments"),
-                ]}
-                onValueChange={(value) => setSpeed(value / SPEED_SCALE)}
-                step={1}
-                value={Math.round(config.speed * SPEED_SCALE)}
-              />
-              <Picker
-                label={"Preset"}
-                modifiers={[pickerStyle("menu"), accessibilityLabel("Speed preset")]}
-                onSelectionChange={setSpeed}
-                selection={config.speed}
-              >
-                {speedOptions.map((speed) => (
-                  <Text key={speed} modifiers={[tag(speed)]}>
-                    {formatSpeed(speed)}
-                  </Text>
-                ))}
-              </Picker>
-            </Section>
-
-            <Section title={"Accelerated APIs"}>
-              {SPEED_FUNCTIONS.map((functionName) => {
-                const copy = FUNCTION_LABELS[functionName];
-                const triggerCount = stats[functionName].toLocaleString();
+              {ACCELERATION_TYPES.map((accelerationType) => {
+                const acceleration = config.accelerations[accelerationType];
+                const copy = ACCELERATION_COPY[accelerationType];
+                const eventCount = stats[accelerationType].toLocaleString();
+                const eventLabel = `${eventCount} ${eventCount === "1" ? "event" : "events"}`;
+                const maxSpeed = accelerationType === "mediaPlayback" ? 16 : MAX_SPEED;
+                const speedOptions = QUICK_SPEEDS.includes(acceleration.speed as (typeof QUICK_SPEEDS)[number])
+                  ? QUICK_SPEEDS
+                  : [acceleration.speed, ...QUICK_SPEEDS];
 
                 return (
-                  <Toggle
-                    isOn={config.enabledFunctions[functionName]}
-                    key={functionName}
-                    modifiers={[
-                      accessibilityLabel(`Accelerate ${copy.title.toLowerCase()}`),
-                      accessibilityHint(copy.description),
-                      accessibilityValue(`${triggerCount} triggers this session`),
-                    ]}
-                    onIsOnChange={(enabled) => setFunctionEnabled(functionName, enabled)}
-                  >
-                    <Text>{copy.title}</Text>
-                    <Text modifiers={[foregroundStyle({ style: "secondary", type: "hierarchical" })]}>
-                      {copy.description} {triggerCount} triggers this session.
-                    </Text>
-                  </Toggle>
+                  <Fragment key={accelerationType}>
+                    <Toggle
+                      isOn={acceleration.enabled}
+                      modifiers={[
+                        accessibilityLabel(`Accelerate ${copy.title.toLowerCase()}`),
+                        accessibilityHint(copy.description),
+                        accessibilityValue(`${eventLabel} this session`),
+                      ]}
+                      onIsOnChange={(enabled) => setAccelerationEnabled(accelerationType, enabled)}
+                    >
+                      <Text>{copy.title}</Text>
+                      <Text modifiers={[foregroundStyle({ style: "secondary", type: "hierarchical" })]}>
+                        {copy.description} · {eventLabel}
+                      </Text>
+                    </Toggle>
+                    {acceleration.enabled ? (
+                      <>
+                        <Stepper
+                          label={`Speed · ${formatSpeed(acceleration.speed)}`}
+                          max={maxSpeed * SPEED_SCALE}
+                          min={MIN_SPEED * SPEED_SCALE}
+                          modifiers={[
+                            accessibilityLabel(`${copy.title} speed multiplier`),
+                            accessibilityValue(formatSpeed(acceleration.speed)),
+                            accessibilityHint("Adjusts this acceleration type in quarter-step increments"),
+                          ]}
+                          onValueChange={(value) => setAccelerationSpeed(accelerationType, value / SPEED_SCALE)}
+                          step={1}
+                          value={Math.round(acceleration.speed * SPEED_SCALE)}
+                        />
+                        <Picker
+                          label={"Quick preset"}
+                          modifiers={[pickerStyle("menu"), accessibilityLabel(`${copy.title} speed preset`)]}
+                          onSelectionChange={(speed) => setAccelerationSpeed(accelerationType, speed)}
+                          selection={acceleration.speed}
+                        >
+                          {speedOptions.map((speed) => (
+                            <Text key={speed} modifiers={[tag(speed)]}>
+                              {formatSpeed(speed)}
+                            </Text>
+                          ))}
+                        </Picker>
+                      </>
+                    ) : null}
+                  </Fragment>
                 );
               })}
             </Section>

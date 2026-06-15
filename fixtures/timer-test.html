@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Speed Browser Timer Test</title>
+    <title>Speed Browser Acceleration Test</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -42,11 +42,32 @@
         font-size: 28px;
         font-weight: 750;
       }
+      .track {
+        height: 10px;
+        margin-top: 14px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: color-mix(in srgb, CanvasText 12%, transparent);
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #0a84ff;
+      }
+      #css-dot {
+        animation: cross-track 4s linear both;
+      }
+      @keyframes cross-track {
+        to {
+          transform: translateX(calc(100vw - 94px));
+        }
+      }
     </style>
   </head>
   <body>
-    <h1>Timer test</h1>
-    <p>A 4,000ms timeout should complete in about 2,000ms when Speed Browser is set to 2×.</p>
+    <h1>Acceleration test</h1>
+    <p>Each 4,000ms test should finish in about 2,000ms when its acceleration type is set to 2×.</p>
     <section class="card">
       <strong>Timeout</strong>
       <span class="value" id="timeout">Waiting…</span>
@@ -55,10 +76,22 @@
       <strong>1,000ms interval</strong>
       <span class="value" id="interval">0 ticks</span>
     </section>
+    <section class="card">
+      <strong>CSS animation</strong>
+      <span class="value" id="css-animation">Waiting…</span>
+      <div class="track"><div class="dot" id="css-dot"></div></div>
+    </section>
+    <section class="card">
+      <strong>Web Animation</strong>
+      <span class="value" id="web-animation">Waiting…</span>
+      <div class="track"><div class="dot" id="web-dot"></div></div>
+    </section>
     <script>
       const startedAt = performance.now();
       const timeoutOutput = document.querySelector("#timeout");
       const intervalOutput = document.querySelector("#interval");
+      const cssAnimationOutput = document.querySelector("#css-animation");
+      const webAnimationOutput = document.querySelector("#web-animation");
       let ticks = 0;
 
       setTimeout(() => {
@@ -69,6 +102,21 @@
         ticks += 1;
         intervalOutput.textContent = `${ticks} ticks in ${Math.round(performance.now() - startedAt)}ms`;
       }, 1000);
+
+      document.querySelector("#css-dot").addEventListener("animationend", () => {
+        cssAnimationOutput.textContent = `Completed in ${Math.round(performance.now() - startedAt)}ms`;
+      });
+
+      const webAnimation = document
+        .querySelector("#web-dot")
+        .animate([{ transform: "translateX(0)" }, { transform: "translateX(calc(100vw - 94px))" }], {
+          duration: 4000,
+          easing: "linear",
+          fill: "both",
+        });
+      webAnimation.finished.then(() => {
+        webAnimationOutput.textContent = `Completed in ${Math.round(performance.now() - startedAt)}ms`;
+      });
     </script>
   </body>
 </html>

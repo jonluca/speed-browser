@@ -8,7 +8,7 @@ import { IconSymbol } from "@/components/icon-symbol";
 import { GlassSurface } from "@/components/ui/glass-surface";
 import { IconButton } from "@/components/ui/icon-button";
 import { useAppColors } from "@/theme/colors";
-import type { SpeedConfig } from "@/types/speed";
+import { ACCELERATION_TYPES, type SpeedConfig } from "@/types/speed";
 import { formatSpeed, getHostname, isHostExcluded, normalizeUrl } from "@/utils/speed-config";
 
 interface BrowserToolbarProps {
@@ -52,16 +52,22 @@ export function BrowserToolbar({
   const host = getHostname(currentUrl);
   const isSecureUrl = currentUrl?.toLowerCase().startsWith("https://") ?? false;
   const isInsecureUrl = currentUrl?.toLowerCase().startsWith("http://") ?? false;
-  const speedActive = config.enabled && !isHostExcluded(config, host);
+  const activeAccelerations = ACCELERATION_TYPES.filter((type) => config.accelerations[type].enabled);
+  const activeSpeeds = new Set(activeAccelerations.map((type) => config.accelerations[type].speed));
+  const speedActive = config.enabled && !isHostExcluded(config, host) && activeAccelerations.length > 0;
   const speedLabel = !config.enabled
     ? "Off"
     : isHostExcluded(config, host)
       ? "Site off"
-      : config.mode === "manual"
-        ? config.pauseInvocations
-          ? "Paused"
-          : "Manual"
-        : formatSpeed(config.speed).replace("x", "×");
+      : activeAccelerations.length === 0
+        ? "None"
+        : config.mode === "manual"
+          ? config.pauseInvocations
+            ? "Paused"
+            : "Manual"
+          : activeSpeeds.size === 1
+            ? formatSpeed(config.accelerations[activeAccelerations[0]].speed).replace("x", "×")
+            : "Mixed";
 
   const submit = () => {
     const target = normalizeUrl(draft);

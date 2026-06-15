@@ -1,30 +1,39 @@
-export const SPEED_FUNCTIONS = ["setTimeout", "setInterval", "requestAnimationFrame"] as const;
+export const ACCELERATION_TYPES = [
+  "setTimeout",
+  "setInterval",
+  "requestAnimationFrame",
+  "webAnimations",
+  "mediaPlayback",
+] as const;
+export const TIMER_FUNCTIONS = ["setTimeout", "setInterval"] as const;
 export const SPEED_MODES = ["automatic", "manual"] as const;
 
-export type SpeedFunctionName = (typeof SPEED_FUNCTIONS)[number];
+export type AccelerationType = (typeof ACCELERATION_TYPES)[number];
+export type TimerFunctionName = (typeof TIMER_FUNCTIONS)[number];
 export type SpeedMode = (typeof SPEED_MODES)[number];
-export type SpeedFunctionSettings = Record<SpeedFunctionName, boolean>;
 
-export interface SpeedConfig {
+export interface AccelerationConfig {
   enabled: boolean;
-  enabledFunctions: SpeedFunctionSettings;
-  excludedHosts: string[];
-  mode: SpeedMode;
-  pauseInvocations: boolean;
   speed: number;
 }
 
-export interface SpeedStats {
-  requestAnimationFrame: number;
-  setInterval: number;
-  setTimeout: number;
+export type AccelerationSettings = Record<AccelerationType, AccelerationConfig>;
+
+export interface SpeedConfig {
+  accelerations: AccelerationSettings;
+  enabled: boolean;
+  excludedHosts: string[];
+  mode: SpeedMode;
+  pauseInvocations: boolean;
 }
+
+export type SpeedStats = Record<AccelerationType, number>;
 
 export interface TimerCall {
   addedAt: number;
   delay: number;
   dueAt: number;
-  functionName: "setInterval" | "setTimeout";
+  functionName: TimerFunctionName;
   handlerLabel: string;
   id: string;
   publicId: number;

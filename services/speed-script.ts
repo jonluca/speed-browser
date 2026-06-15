@@ -30,6 +30,12 @@ export function buildSpeedInjectionScript({ bridgeToken, config, disabledSourceK
   var nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window);
   var nativeCancelAnimationFrame = window.cancelAnimationFrame.bind(window);
   var nativePerformanceNow = window.performance.now.bind(window.performance);
+  var nativeElementAnimate = window.Element && window.Element.prototype.animate;
+  var nativeDocumentGetAnimations = document.getAnimations;
+  var nativeAnimationUpdatePlaybackRate = window.Animation && window.Animation.prototype.updatePlaybackRate;
+  var nativeAnimationPlaybackRate = window.Animation && Object.getOwnPropertyDescriptor(window.Animation.prototype, "playbackRate");
+  var nativeMediaPlaybackRate = window.HTMLMediaElement && Object.getOwnPropertyDescriptor(window.HTMLMediaElement.prototype, "playbackRate");
+  var NativeMutationObserver = window.MutationObserver;
   var nativeFunctionToString = Function.prototype.toString;
   var nativeBridgePostMessage = window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === "function"
     ? window.ReactNativeWebView.postMessage.bind(window.ReactNativeWebView)
@@ -39,11 +45,12 @@ export function buildSpeedInjectionScript({ bridgeToken, config, disabledSourceK
   var MAX_CALL_SNAPSHOTS = 200;
   var MAX_DISABLED_SOURCES = 500;
   var MAX_EXCLUDED_HOSTS = 500;
+  var MAX_MEDIA_PLAYBACK_RATE = 16;
   var MAX_SOURCE_LENGTH = 512;
   var disabledSources = new Set(${initialDisabledSources}.slice(0, MAX_DISABLED_SOURCES).map(function (key) { return limitedString(key, MAX_SOURCE_LENGTH + 32); }));
   var timers = new Map();
   var callsById = new Map();
-  var pendingStats = { setTimeout: 0, setInterval: 0, requestAnimationFrame: 0 };
+  var pendingStats = { setTimeout: 0, setInterval: 0, requestAnimationFrame: 0, webAnimations: 0, mediaPlayback: 0 };
   var nextTimerId = -1;
   var nextCallSequence = 1;
   var pageSessionId = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
@@ -51,6 +58,12 @@ export function buildSpeedInjectionScript({ bridgeToken, config, disabledSourceK
   var callsFlushId;
   var callsTickId;
   var callsWerePublished = false;
+  var animationBaseRates = new WeakMap();
+  var acceleratedAnimations = new WeakSet();
+  var mediaBaseRates = new WeakMap();
+  var acceleratedMedia = new WeakSet();
+  var contentObserver;
+  var contentSyncId;
   var virtualClockBase = nativePerformanceNow();
   var realClockBase = virtualClockBase;
   var lastAnimationTimestamp = virtualClockBase;
@@ -72,17 +85,28 @@ export function buildSpeedInjectionScript({ bridgeToken, config, disabledSourceK
   function normalizeConfig(value) {
     var source = value && typeof value === "object" ? value : {};
     var functions = source.enabledFunctions && typeof source.enabledFunctions === "object" ? source.enabledFunctions : {};
+    var accelerations = source.accelerations && typeof source.accelerations === "object" ? source.accelerations : {};
+    var legacySpeed = normalizeSpeed(source.speed);
     return {
-      enabled: typeof source.enabled === "boolean" ? source.enabled : true,
-      enabledFunctions: {
-        setTimeout: typeof functions.setTimeout === "boolean" ? functions.setTimeout : true,
-        setInterval: typeof functions.setInterval === "boolean" ? functions.setInterval : true,
-        requestAnimationFrame: typeof functions.requestAnimationFrame === "boolean" ? functions.requestAnimationFrame : false
+      accelerations: {
+        setTimeout: normalizeAcceleration(accelerations.setTimeout, functions.setTimeout, true, legacySpeed),
+        setInterval: normalizeAcceleration(accelerations.setInterval, functions.setInterval, true, legacySpeed),
+        requestAnimationFrame: normalizeAcceleration(accelerations.requestAnimationFrame, functions.requestAnimationFrame, false, legacySpeed),
+        webAnimations: normalizeAcceleration(accelerations.webAnimations, undefined, false, legacySpeed),
+        mediaPlayback: normalizeAcceleration(accelerations.mediaPlayback, undefined, false, legacySpeed)
       },
+      enabled: typeof source.enabled === "boolean" ? source.enabled : true,
       excludedHosts: Array.isArray(source.excludedHosts) ? source.excludedHosts.slice(0, MAX_EXCLUDED_HOSTS).map(function (host) { return limitedString(host, 253).toLowerCase(); }) : [],
       mode: source.mode === "manual" ? "manual" : "automatic",
-      pauseInvocations: source.mode === "manual" && source.pauseInvocations === true,
-      speed: normalizeSpeed(source.speed)
+      pauseInvocations: source.mode === "manual" && source.pauseInvocations === true
+    };
+  }
+
+  function normalizeAcceleration(value, legacyEnabled, defaultEnabled, legacySpeed) {
+    var source = value && typeof value === "object" ? value : {};
+    return {
+      enabled: typeof source.enabled === "boolean" ? source.enabled : typeof legacyEnabled === "boolean" ? legacyEnabled : defaultEnabled,
+      speed: source.speed == null ? legacySpeed : normalizeSpeed(source.speed)
     };
   }
 
@@ -92,17 +116,18 @@ export function buildSpeedInjectionScript({ bridgeToken, config, disabledSourceK
     return config.excludedHosts.indexOf(window.location.hostname.toLowerCase()) !== -1;
   }
 
-  function functionIsAllowed(functionName) {
-    return config.enabled && !hostIsExcluded() && config.enabledFunctions[functionName] === true;
+  function accelerationIsAllowed(accelerationType) {
+    return config.enabled && !hostIsExcluded() && config.accelerations[accelerationType].enabled === true;
   }
 
-  function speedFor(functionName) {
-    if (!functionIsAllowed(functionName) || config.mode !== "automatic") return 1;
-    return config.speed;
+  function speedFor(accelerationType) {
+    if (!accelerationIsAllowed(accelerationType)) return 1;
+    if (config.mode === "manual" && (accelerationType === "setTimeout" || accelerationType === "setInterval")) return 1;
+    return config.accelerations[accelerationType].speed;
   }
 
   function shouldManageTimer(functionName) {
-    return functionIsAllowed(functionName) && (config.mode === "manual" || config.speed > 1);
+    return accelerationIsAllowed(functionName) && (config.mode === "manual" || speedFor(functionName) > 1);
   }
 
   function normalizedDelay(delay) {
@@ -142,12 +167,13 @@ export function buildSpeedInjectionScript({ bridgeToken, config, disabledSourceK
   }
 
   function logStat(functionName) {
+    if (!(functionName in pendingStats)) return;
     pendingStats[functionName] += 1;
     if (statsFlushId != null) return;
     statsFlushId = nativeSetTimeout(function () {
       statsFlushId = undefined;
       post("${BRIDGE_NAMESPACE}:stats", { stats: pendingStats });
-      pendingStats = { setTimeout: 0, setInterval: 0, requestAnimationFrame: 0 };
+      pendingStats = { setTimeout: 0, setInterval: 0, requestAnimationFrame: 0, webAnimations: 0, mediaPlayback: 0 };
     }, 250);
   }
 
@@ -241,7 +267,7 @@ export function buildSpeedInjectionScript({ bridgeToken, config, disabledSourceK
     if (!record.active) return;
     record.scheduledSpeed = speedFor(record.functionName);
     record.startedAt = nativePerformanceNow();
-    if (config.mode === "manual" && config.pauseInvocations && functionIsAllowed(record.functionName)) {
+    if (config.mode === "manual" && config.pauseInvocations && accelerationIsAllowed(record.functionName)) {
       record.nativeId = undefined;
       scheduleCallsFlush();
       return;
@@ -392,12 +418,177 @@ export function buildSpeedInjectionScript({ bridgeToken, config, disabledSourceK
     nativeCancelAnimationFrame(id);
   }
 
+  function nativeAnimationRate(animation) {
+    if (!nativeAnimationPlaybackRate || typeof nativeAnimationPlaybackRate.get !== "function") return 1;
+    try {
+      var rate = Number(nativeAnimationPlaybackRate.get.call(animation));
+      return Number.isFinite(rate) ? rate : 1;
+    } catch (_error) {
+      return 1;
+    }
+  }
+
+  function setNativeAnimationRate(animation, rate) {
+    try {
+      if (nativeAnimationPlaybackRate && typeof nativeAnimationPlaybackRate.set === "function") {
+        nativeAnimationPlaybackRate.set.call(animation, rate);
+      }
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function applyAnimationRate(animation) {
+    if (!animation || !nativeAnimationPlaybackRate) return;
+    if (!animationBaseRates.has(animation)) animationBaseRates.set(animation, nativeAnimationRate(animation));
+    var baseRate = animationBaseRates.get(animation);
+    var multiplier = speedFor("webAnimations");
+    if (!setNativeAnimationRate(animation, baseRate * multiplier)) return;
+    if (multiplier > 1 && baseRate !== 0 && !acceleratedAnimations.has(animation)) {
+      acceleratedAnimations.add(animation);
+      logStat("webAnimations");
+    }
+  }
+
+  function managedAnimationPlaybackRateGetter() {
+    return animationBaseRates.has(this) ? animationBaseRates.get(this) : nativeAnimationRate(this);
+  }
+
+  function managedAnimationPlaybackRateSetter(value) {
+    var baseRate = Number(value);
+    var effectiveRate = baseRate * speedFor("webAnimations");
+    nativeAnimationPlaybackRate.set.call(this, effectiveRate);
+    animationBaseRates.set(this, baseRate);
+    if (effectiveRate !== baseRate && baseRate !== 0 && !acceleratedAnimations.has(this)) {
+      acceleratedAnimations.add(this);
+      logStat("webAnimations");
+    }
+  }
+
+  function managedAnimationUpdatePlaybackRate(value) {
+    var baseRate = Number(value);
+    var effectiveRate = baseRate * speedFor("webAnimations");
+    var result = nativeAnimationUpdatePlaybackRate.call(this, effectiveRate);
+    animationBaseRates.set(this, baseRate);
+    if (effectiveRate !== baseRate && baseRate !== 0 && !acceleratedAnimations.has(this)) {
+      acceleratedAnimations.add(this);
+      logStat("webAnimations");
+    }
+    return result;
+  }
+
+  function managedElementAnimate() {
+    var animation = nativeElementAnimate.apply(this, arguments);
+    applyAnimationRate(animation);
+    return animation;
+  }
+
+  function syncAnimations() {
+    if (typeof nativeDocumentGetAnimations !== "function") return;
+    try {
+      nativeDocumentGetAnimations.call(document).forEach(applyAnimationRate);
+    } catch (_error) {}
+  }
+
+  function nativeMediaRate(media) {
+    if (!nativeMediaPlaybackRate || typeof nativeMediaPlaybackRate.get !== "function") return 1;
+    try {
+      var rate = Number(nativeMediaPlaybackRate.get.call(media));
+      return Number.isFinite(rate) ? rate : 1;
+    } catch (_error) {
+      return 1;
+    }
+  }
+
+  function effectiveMediaRate(baseRate) {
+    var multiplier = speedFor("mediaPlayback");
+    var desiredRate = baseRate * multiplier;
+    return multiplier > 1 && desiredRate > MAX_MEDIA_PLAYBACK_RATE ? MAX_MEDIA_PLAYBACK_RATE : desiredRate;
+  }
+
+  function setNativeMediaRate(media, baseRate) {
+    if (!nativeMediaPlaybackRate || typeof nativeMediaPlaybackRate.set !== "function") return undefined;
+    var multiplier = speedFor("mediaPlayback");
+    var desiredRate = effectiveMediaRate(baseRate);
+    var candidates = [desiredRate];
+    if (multiplier > 4) candidates.push(baseRate * 4);
+    if (multiplier > 2) candidates.push(baseRate * 2);
+    candidates.push(baseRate);
+    for (var index = 0; index < candidates.length; index += 1) {
+      var candidate = candidates[index];
+      if (index > 0 && candidate === candidates[index - 1]) continue;
+      try {
+        nativeMediaPlaybackRate.set.call(media, candidate);
+        return candidate;
+      } catch (_error) {}
+    }
+    return undefined;
+  }
+
+  function applyMediaRate(media) {
+    if (!media || !nativeMediaPlaybackRate) return;
+    if (!mediaBaseRates.has(media)) mediaBaseRates.set(media, nativeMediaRate(media));
+    var baseRate = mediaBaseRates.get(media);
+    var appliedRate = setNativeMediaRate(media, baseRate);
+    if (appliedRate == null) return;
+    if (appliedRate !== baseRate && !acceleratedMedia.has(media)) {
+      acceleratedMedia.add(media);
+      logStat("mediaPlayback");
+    }
+  }
+
+  function managedMediaPlaybackRateGetter() {
+    return mediaBaseRates.has(this) ? mediaBaseRates.get(this) : nativeMediaRate(this);
+  }
+
+  function managedMediaPlaybackRateSetter(value) {
+    var baseRate = Number(value);
+    var appliedRate = setNativeMediaRate(this, baseRate);
+    if (appliedRate == null) nativeMediaPlaybackRate.set.call(this, baseRate);
+    mediaBaseRates.set(this, baseRate);
+    if (appliedRate !== baseRate && !acceleratedMedia.has(this)) {
+      acceleratedMedia.add(this);
+      logStat("mediaPlayback");
+    }
+  }
+
+  function syncMedia(root) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    if (root.matches && root.matches("audio, video")) applyMediaRate(root);
+    root.querySelectorAll("audio, video").forEach(applyMediaRate);
+  }
+
+  function syncAcceleratedContent() {
+    contentSyncId = undefined;
+    syncAnimations();
+    syncMedia(document);
+  }
+
+  function scheduleContentSync() {
+    if (contentSyncId == null) contentSyncId = nativeSetTimeout(syncAcceleratedContent, 0);
+  }
+
+  function installContentObserver() {
+    if (typeof NativeMutationObserver !== "function") return;
+    try {
+      contentObserver = new NativeMutationObserver(scheduleContentSync);
+      contentObserver.observe(document, {
+        attributeFilter: ["class", "style"],
+        attributes: true,
+        childList: true,
+        subtree: true
+      });
+    } catch (_error) {}
+  }
+
   function updateConfig(nextConfig) {
     var now = nativePerformanceNow();
     virtualClockBase = virtualNow(now);
     realClockBase = now;
     config = normalizeConfig(nextConfig);
     rescheduleAll();
+    scheduleContentSync();
     scheduleCallsFlush();
   }
 
@@ -457,6 +648,10 @@ export function buildSpeedInjectionScript({ bridgeToken, config, disabledSourceK
   nativeToString(managedClearInterval, window.clearInterval);
   nativeToString(managedRequestAnimationFrame, window.requestAnimationFrame);
   nativeToString(managedCancelAnimationFrame, window.cancelAnimationFrame);
+  if (typeof nativeElementAnimate === "function") nativeToString(managedElementAnimate, nativeElementAnimate);
+  if (typeof nativeAnimationUpdatePlaybackRate === "function") {
+    nativeToString(managedAnimationUpdatePlaybackRate, nativeAnimationUpdatePlaybackRate);
+  }
 
   window.setTimeout = managedSetTimeout;
   window.setInterval = managedSetInterval;
@@ -464,6 +659,28 @@ export function buildSpeedInjectionScript({ bridgeToken, config, disabledSourceK
   window.clearInterval = managedClearInterval;
   window.requestAnimationFrame = managedRequestAnimationFrame;
   window.cancelAnimationFrame = managedCancelAnimationFrame;
+  if (window.Element && typeof nativeElementAnimate === "function") {
+    try { window.Element.prototype.animate = managedElementAnimate; } catch (_error) {}
+  }
+  if (window.Animation && nativeAnimationPlaybackRate && typeof nativeAnimationPlaybackRate.get === "function" && typeof nativeAnimationPlaybackRate.set === "function") {
+    try {
+      Object.defineProperty(window.Animation.prototype, "playbackRate", Object.assign({}, nativeAnimationPlaybackRate, {
+        get: managedAnimationPlaybackRateGetter,
+        set: managedAnimationPlaybackRateSetter
+      }));
+    } catch (_error) {}
+  }
+  if (window.Animation && typeof nativeAnimationUpdatePlaybackRate === "function") {
+    try { window.Animation.prototype.updatePlaybackRate = managedAnimationUpdatePlaybackRate; } catch (_error) {}
+  }
+  if (window.HTMLMediaElement && nativeMediaPlaybackRate && typeof nativeMediaPlaybackRate.get === "function" && typeof nativeMediaPlaybackRate.set === "function") {
+    try {
+      Object.defineProperty(window.HTMLMediaElement.prototype, "playbackRate", Object.assign({}, nativeMediaPlaybackRate, {
+        get: managedMediaPlaybackRateGetter,
+        set: managedMediaPlaybackRateSetter
+      }));
+    } catch (_error) {}
+  }
   window.__speedBrowser = {
     installed: true,
     command: command,
@@ -471,10 +688,19 @@ export function buildSpeedInjectionScript({ bridgeToken, config, disabledSourceK
     updateDisabledSources: updateDisabledSources
   };
 
+  document.addEventListener("animationstart", scheduleContentSync, true);
+  document.addEventListener("transitionrun", scheduleContentSync, true);
+  document.addEventListener("loadedmetadata", function (event) { applyMediaRate(event.target); }, true);
+  document.addEventListener("play", function (event) { applyMediaRate(event.target); }, true);
+  installContentObserver();
+  scheduleContentSync();
+
   window.addEventListener("pagehide", function () {
     if (statsFlushId != null) nativeClearTimeout(statsFlushId);
     if (callsFlushId != null) nativeClearTimeout(callsFlushId);
     if (callsTickId != null) nativeClearInterval(callsTickId);
+    if (contentSyncId != null) nativeClearTimeout(contentSyncId);
+    if (contentObserver) contentObserver.disconnect();
   });
 
   post("${BRIDGE_NAMESPACE}:ready", { url: window.location.href });

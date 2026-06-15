@@ -41,6 +41,10 @@ export function TimerCallsSheet({ onClose, onCommand, visible }: TimerCallsSheet
     .sort((left, right) =>
       sortMode === "recent" ? right.addedAt - left.addedAt : right.delay - left.delay || right.addedAt - left.addedAt,
     );
+  const allCallsHidden = calls.length > 0 && visibleCalls.length === 0;
+  const trackedLabel = calls.length === 1 ? "1 timer tracked" : `${calls.length} timers tracked`;
+  const headerSubtitle =
+    visibleCalls.length === calls.length ? trackedLabel : `${visibleCalls.length} visible · ${trackedLabel}`;
 
   return (
     <Modal animationType={"slide"} onRequestClose={onClose} presentationStyle={"pageSheet"} visible={visible}>
@@ -49,9 +53,7 @@ export function TimerCallsSheet({ onClose, onCommand, visible }: TimerCallsSheet
           <View style={styles.headerSide} />
           <View style={styles.headerTitleWrap}>
             <Text style={[styles.headerTitle, { color: colors.label }]}>Active Timers</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.secondaryLabel }]}>
-              {calls.length === 1 ? "1 timer tracked" : `${calls.length} timers tracked`}
-            </Text>
+            <Text style={[styles.headerSubtitle, { color: colors.secondaryLabel }]}>{headerSubtitle}</Text>
           </View>
           <Pressable
             accessibilityHint={"Closes active timers"}
@@ -98,10 +100,13 @@ export function TimerCallsSheet({ onClose, onCommand, visible }: TimerCallsSheet
               <View style={[styles.emptyIcon, { backgroundColor: colors.accentMuted }]}>
                 <IconSymbol color={colors.accent} name={"timer"} size={28} />
               </View>
-              <Text style={[styles.emptyTitle, { color: colors.label }]}>No active timers</Text>
+              <Text style={[styles.emptyTitle, { color: colors.label }]}>
+                {allCallsHidden ? "All timers hidden" : "No active timers"}
+              </Text>
               <Text style={[styles.emptyBody, { color: colors.secondaryLabel }]}>
-                Browse a page in Manual mode. JavaScript timeouts and intervals will appear here as the page creates
-                them.
+                {allCallsHidden
+                  ? "All active timer sources are hidden. Restore one below to show its timers again."
+                  : "Browse a page in Manual mode. JavaScript timeouts and intervals will appear here as the page creates them."}
               </Text>
             </View>
           ) : (

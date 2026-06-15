@@ -2,8 +2,14 @@ import AsyncStorage from "expo-sqlite/kv-store";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import type { SpeedConfig, SpeedFunctionName, SpeedStats, TimerCall } from "@/types/speed";
-import { DEFAULT_SPEED_CONFIG, EMPTY_SPEED_STATS, clampSpeed, setHostExcluded } from "@/utils/speed-config";
+import type { AccelerationType, SpeedConfig, SpeedStats, TimerCall } from "@/types/speed";
+import {
+  DEFAULT_SPEED_CONFIG,
+  EMPTY_SPEED_STATS,
+  clampAccelerationSpeed,
+  normalizeSpeedConfig,
+  setHostExcluded,
+} from "@/utils/speed-config";
 
 interface AppStore {
   config: SpeedConfig;
@@ -19,12 +25,12 @@ interface AppStore {
   resetStats: () => void;
   setConfig: (config: SpeedConfig) => void;
   setEnabled: (enabled: boolean) => void;
-  setFunctionEnabled: (name: SpeedFunctionName, enabled: boolean) => void;
+  setAccelerationEnabled: (name: AccelerationType, enabled: boolean) => void;
+  setAccelerationSpeed: (name: AccelerationType, speed: number) => void;
   setHasHydrated: (hydrated: boolean) => void;
   setHostExcluded: (host: string, excluded: boolean) => void;
   setMode: (mode: SpeedConfig["mode"]) => void;
   setPauseInvocations: (paused: boolean) => void;
-  setSpeed: (speed: number) => void;
   setStats: (stats: Partial<SpeedStats>) => void;
   setTimerCalls: (calls: TimerCall[]) => void;
   toggleDisabledSource: (sourceKey: string, disabled: boolean) => void;
@@ -57,11 +63,24 @@ export const useAppStore = create<AppStore>()(
       resetStats: () => set({ stats: EMPTY_SPEED_STATS }),
       setConfig: (config) => set({ config }),
       setEnabled: (enabled) => set((state) => ({ config: { ...state.config, enabled } })),
-      setFunctionEnabled: (name, enabled) =>
+      setAccelerationEnabled: (name, enabled) =>
         set((state) => ({
           config: {
             ...state.config,
-            enabledFunctions: { ...state.config.enabledFunctions, [name]: enabled },
+            accelerations: {
+              ...state.config.accelerations,
+              [name]: { ...state.config.accelerations[name], enabled },
+            },
+          },
+        })),
+      setAccelerationSpeed: (name, speed) =>
+        set((state) => ({
+          config: {
+            ...state.config,
+            accelerations: {
+              ...state.config.accelerations,
+              [name]: { ...state.config.accelerations[name], speed: clampAccelerationSpeed(name, speed) },
+            },
           },
         })),
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
@@ -75,13 +94,14 @@ export const useAppStore = create<AppStore>()(
           },
         })),
       setPauseInvocations: (pauseInvocations) => set((state) => ({ config: { ...state.config, pauseInvocations } })),
-      setSpeed: (speed) => set((state) => ({ config: { ...state.config, speed: clampSpeed(speed) } })),
       setStats: (stats) =>
         set((state) => ({
           stats: {
+            mediaPlayback: state.stats.mediaPlayback + (stats.mediaPlayback ?? 0),
             requestAnimationFrame: state.stats.requestAnimationFrame + (stats.requestAnimationFrame ?? 0),
             setInterval: state.stats.setInterval + (stats.setInterval ?? 0),
             setTimeout: state.stats.setTimeout + (stats.setTimeout ?? 0),
+            webAnimations: state.stats.webAnimations + (stats.webAnimations ?? 0),
           },
         })),
       setTimerCalls: (timerCalls) => set({ timerCalls }),
@@ -107,6 +127,14 @@ export const useAppStore = create<AppStore>()(
         hiddenSourceKeys: state.hiddenSourceKeys,
         recentUrls: state.recentUrls,
       }),
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<AppStore>;
+        return {
+          ...current,
+          ...saved,
+          config: normalizeSpeedConfig(saved.config),
+        };
+      },
       onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
     },
   ),

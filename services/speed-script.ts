@@ -333,9 +333,10 @@ export function buildSpeedInjectionScript({ bridgeToken, config, disabledSourceK
   }
 
   function createRecord(functionName, type, handler, delay, args) {
-    var source = config.mode === "manual" || disabledSources.size > 0
-      ? sourceFor(functionName, handler, delay)
-      : fallbackSource(functionName, handler, delay);
+    // Keep a stable call-site identity even when the timer is created in
+    // automatic mode. The same key is displayed and blocked if the user later
+    // switches to manual mode.
+    var source = sourceFor(functionName, handler, delay);
     var publicId = nextTimerId;
     nextTimerId -= 1;
     if (disabledSources.has(source.key)) return publicId;
@@ -361,7 +362,6 @@ export function buildSpeedInjectionScript({ bridgeToken, config, disabledSourceK
     nextCallSequence += 1;
     timers.set(publicId, record);
     callsById.set(record.callId, record);
-    logStat(functionName);
     scheduleRecord(record);
     return publicId;
   }

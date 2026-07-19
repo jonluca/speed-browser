@@ -6,6 +6,7 @@
   "packageManager": "pnpm@11.5.2",
   "scripts": {
     "start": "expo start",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "ios": "expo run:ios",
     "android": "expo run:android",
     "typecheck": "tsgo --noEmit",

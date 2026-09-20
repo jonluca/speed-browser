@@ -11,7 +11,7 @@ packageExtensions:
         optional: true
 
 minimumReleaseAgeExclude:
-  # Expo 56 is intentionally allowlisted while this app is brought up on Palate's exact stack.
+  # Expo packages follow the supported SDK 57 dependency set.
   - "@expo/cli"
   - "@expo/expo-modules-macros-plugin"
   - "@expo/log-box"
@@ -71,6 +71,7 @@ minimumReleaseAgeExclude:
   - "dnssd-advertise"
   - "electron-to-chromium"
   - "eslint"
+  - "@oxfmt/binding-*"
   - "oxfmt"
   - "oxlint"
   - "react-native-drawer-layout"
